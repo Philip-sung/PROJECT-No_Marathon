@@ -6,12 +6,13 @@ import { z } from 'zod';
  */
 const publicEnvSchema = z.object({
   NEXT_PUBLIC_APP_MODE: z.enum(['mock', 'live']).default('mock'),
-  // 끝의 슬래시를 제거한다 — 안 그러면 Supabase REST 경로가 `…co//rest/v1/…` 이중 슬래시가 돼
-  // "Invalid path specified in request URL" 로 실패한다(흔한 함정).
+  // Supabase URL 은 프로젝트 origin 만 유효하다. 끝 슬래시나 `/rest/v1` 같은 경로가 붙으면
+  // REST 요청 경로가 이중(`…/rest/v1//rest/v1/…`)이 돼 "Invalid path specified in request URL"
+  // 로 실패하므로 origin 으로 정규화한다(예: `https://x.supabase.co/rest/v1/` → `https://x.supabase.co`).
   NEXT_PUBLIC_SUPABASE_URL: z
     .string()
     .url()
-    .transform((s) => s.replace(/\/+$/, ''))
+    .transform((s) => new URL(s).origin)
     .optional()
     .or(z.literal('')),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().optional().or(z.literal('')),

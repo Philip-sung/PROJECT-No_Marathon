@@ -249,9 +249,12 @@ Ingress 에 `nginx.ingress.kubernetes.io/rewrite-target: /` 를 넣으면 `/api/
 `/` 로 재작성된다. Carrsh/Obtopus(SPA)는 써도 되지만 No-Marathon(SSR)은 **넣지 않는다**.
 
 **⑧ 홈이 500, 로그에 `집계 조회 실패: Invalid path specified in request URL`**
-`NEXT_PUBLIC_SUPABASE_URL` 끝에 슬래시가 붙어(`https://xxx.supabase.co/`) Supabase REST 경로가 이중
-슬래시(`…co//rest/v1/…`)가 된 것. GitHub Secret 값에서 trailing slash 제거 후 **재빌드**.
-(코드에서도 `env.ts` 가 trailing slash 를 정규화하도록 방어 처리됨 — 커밋 후 재빌드 시 적용.)
+`NEXT_PUBLIC_SUPABASE_URL` 에 **프로젝트 origin 이 아닌 값**(끝 슬래시 `…supabase.co/`, 또는 경로가 붙은
+`…supabase.co/rest/v1/`)이 들어간 것. 그러면 REST 경로가 이중(`…/rest/v1//rest/v1/…`)이 돼 실패한다.
+값은 반드시 **`https://<ref>.supabase.co`** (Settings → API 의 "Project URL", 뒤에 아무것도 없이).
+GitHub Secret 을 고친 뒤 **재빌드**. (코드에서도 `env.ts` 가 `new URL(s).origin` 으로 정규화하므로
+커밋 후 재빌드되면 슬래시·경로 suffix 둘 다 무력화됨. 박힌 값 확인:
+`kubectl exec deploy/no-marathon-deployment -- grep -rhoE "https://[a-z0-9.-]+\.supabase\.co[a-z0-9/_-]*" /app/.next/server | sort -u`.)
 참고: 로그가 `live 모드에는 … 가 필요합니다` 면 빌드 때 Supabase Secret 자체가 비었던 것(GitHub Secrets 설정 후 재빌드).
 `relation "v_marathon_stats" does not exist` 면 마이그레이션 미적용(루트 README 2번).
 
