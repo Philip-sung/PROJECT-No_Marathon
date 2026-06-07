@@ -1,0 +1,34 @@
+import type { Metadata, Viewport } from 'next';
+import './globals.css';
+
+// SEO/SNS 확산 기반(여론 조성 목적). Phase 3에서 OG 이미지·페이지별 메타 확장.
+export const metadata: Metadata = {
+  metadataBase: new URL('https://no-marathon.kr'),
+  title: {
+    default: 'no-marathon.kr — 주말 마라톤 교통 불편, 함께 기록합니다',
+    template: '%s | no-marathon.kr',
+  },
+  description:
+    '서울 주말 마라톤 교통통제로 인한 시민 불편을 기록하고, 대책을 요구하며, 우회 정보를 제공합니다.',
+  openGraph: {
+    type: 'website',
+    locale: 'ko_KR',
+    siteName: 'no-marathon.kr',
+  },
+  robots: { index: true, follow: true },
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
+  return (
+    <html lang="ko">
+      <body>{children}</body>
+    </html>
+  );
+}

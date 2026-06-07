@@ -2,21 +2,22 @@
 
 > 매 Phase 갱신. 신뢰 출처(context rot 방어). last-checked 기준 최신 상태만 유지하고 과거는 ARCHIVE.md로 compaction.
 
-last-checked: 2026-06-07 (Phase 0 완료)
+last-checked: 2026-06-07 (Phase 1 완료)
 
 ## Current
-- Phase: **Phase 0 완료, Phase 1 대기 (방향 트랙 확정 게이트)**
-- 다음 액션: 사용자 방향 확정 + `다음` → Phase 1(빌드 하니스 & 부트스트랩) 시작
-- 권고: dual-track(주=공익+비침습 AdSense / 부=저비용 자산화 헤지). "매각 단독목표" 비권장.
+- Phase: **Phase 1 완료, Phase 2 대기**
+- 다음 액션: 사용자 `다음` → Phase 2(데이터 모델 & Supabase 스키마 + RLS) 시작
+- 방향 확정: dual-track (ADR-003).
 
 ## Done
 - [x] PDF(TR-2026-04) 분석 + 4-Layer/4-Tier/품질기법 매핑
 - [x] 스택 확정: Next.js(App Router) + Supabase, dual-track 방향
 - [x] PLAN.md / SOUL.md / PROGRESS.md 작성 (빌드 하니스 가동)
 - [x] Phase 0 — 리서치 & 방향 권고 (docs/00_direction-report.md, 채점 8.5/10)
+- [x] Phase 1 — 부트스트랩 (Next.js15+Supabase+Zod+Tailwind, env/mock 분리, CI, DECISIONS) 채점 9/10
+      검증: typecheck·lint·build·format 전부 통과
 
-## Queue (Phase 1 → 9)
-- [ ] Phase 1 — 빌드 하니스 & 프로젝트 부트스트랩
+## Queue (Phase 2 → 9)
 - [ ] Phase 2 — 데이터 모델 & Supabase 스키마 + RLS
 - [ ] Phase 3 — 공유 레이아웃 & 마라톤 선택 컨텍스트
 - [ ] Phase 4 — 페이지 ① 취지
