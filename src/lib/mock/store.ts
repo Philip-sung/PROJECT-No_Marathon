@@ -110,12 +110,6 @@ interface EventRow {
 const events: EventRow[] = [];
 let eventSeq = 0;
 
-let counter = 0;
-function nextId(prefix: string): string {
-  counter += 1;
-  return `${prefix}-mock-${counter}`;
-}
-
 function toPublicDisruption(r: DisruptionRow): DisruptionPublic {
   return {
     id: r.id,
@@ -289,7 +283,7 @@ export function addCollectionLog(entry: {
   nowIso: string;
 }): void {
   collectionLog.push({
-    id: nextId('log'),
+    id: randomUUID(),
     run_id: entry.run_id,
     target: entry.target,
     content_hash: entry.content_hash,
@@ -365,7 +359,7 @@ export function upsertDisruption(
     return;
   }
   disruptions.push({
-    id: nextId('disr'),
+    id: randomUUID(),
     marathon_id: input.marathon_id,
     minutes_lost: input.minutes_lost,
     note: input.note ?? null,
@@ -381,7 +375,7 @@ export function addComment(
   nowIso: string,
 ): void {
   comments.push({
-    id: nextId('cmt'),
+    id: randomUUID(),
     marathon_id: input.marathon_id,
     body: input.body,
     like_count: 0,
@@ -408,7 +402,7 @@ export function addReport(
   nowIso: string,
 ): void {
   reports.push({
-    id: nextId('rep'),
+    id: randomUUID(),
     device_hash: deviceHash,
     body: input.body,
     contact: input.contact ?? null,
