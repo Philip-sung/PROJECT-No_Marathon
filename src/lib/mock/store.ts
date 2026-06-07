@@ -86,6 +86,82 @@ const marathons: MarathonRow[] = MOCK_MARATHONS.map((m, i) => ({
   created_at: m.created_at,
 }));
 
+// ── 대규모 시각 테스트 시드(MOCK_HEAVY=1 일 때만) ──────────
+// 댓글 다수·시간 초대형 상태에서 UI(카운터/리스트/정렬)가 어떻게 보이는지 확인용.
+if (process.env.MOCK_HEAVY) {
+  const HEAVY_ID = 'aaaa0000-0000-4000-8000-000000000000';
+  marathons.push({
+    id: HEAVY_ID,
+    name: '[테스트] 대규모 마라톤',
+    event_date: '2026-05-03',
+    start_time: null,
+    end_time: null,
+    area: '서울 도심 전역',
+    lat: 37.5665,
+    lng: 126.978,
+    organizer_name: '테스트조직위',
+    organizer_url: 'https://example.org/heavy',
+    organizer_contact: '02-000-0000',
+    organizer_email: 'heavy@example.org',
+    detour_info: {
+      subway: ['도심 전 노선 우회 권장', '1·2호선 환승 지연'],
+      bus: ['도심 통과 간선 다수 지연·우회'],
+    },
+    source: 'seed-heavy',
+    content_hash: 'seed-heavy',
+    status: 'published',
+    created_at: '2026-05-01T00:00:00+09:00',
+  });
+
+  const heavyNames: (string | null)[] = [
+    '종로직장인',
+    '광화문주민',
+    '을지로상인',
+    '시청통근러',
+    '회기동학생',
+    null,
+  ];
+  for (let i = 0; i < 480; i += 1) {
+    const hh = String(6 + (i % 12)).padStart(2, '0');
+    const mm = String(i % 60).padStart(2, '0');
+    disruptions.push({
+      id: randomUUID(),
+      marathon_id: HEAVY_ID,
+      minutes_lost: 30 + ((i * 13) % 451), // 30~480
+      note:
+        i % 3 === 0
+          ? '버스가 한참 안 옴'
+          : i % 3 === 1
+            ? '길이 다 막혀 한참 걸림'
+            : null,
+      display_name: heavyNames[i % heavyNames.length] ?? null,
+      created_at: `2026-05-03T${hh}:${mm}:00+09:00`,
+      device_hash: `heavy-d-${i}`,
+    });
+  }
+
+  const heavyBodies = [
+    '주말마다 이러니 너무 힘듭니다.',
+    '응급차는 어떻게 지나가나요? 대책이 필요합니다.',
+    '우회 안내가 전혀 없어서 한참 헤맸어요.',
+    '사전 공지라도 제대로 해주세요.',
+    '버스가 30분 넘게 안 왔습니다.',
+    '도심 통제 좀 분산해주세요.',
+  ];
+  for (let i = 0; i < 80; i += 1) {
+    const hh = String(8 + (i % 10)).padStart(2, '0');
+    const mm = String(i % 60).padStart(2, '0');
+    comments.push({
+      id: randomUUID(),
+      marathon_id: HEAVY_ID,
+      body: `${heavyBodies[i % heavyBodies.length] ?? ''} (#${i + 1})`,
+      like_count: i < 5 ? 120 - i * 18 : (i * 7) % 25,
+      created_at: `2026-05-03T${hh}:${mm}:00+09:00`,
+      device_hash: `heavy-c-${i}`,
+    });
+  }
+}
+
 // ── 수집 ledger(L2) ───────────────────────────────────────
 interface CollectionLogRow {
   id: string;
