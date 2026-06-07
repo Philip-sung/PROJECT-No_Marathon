@@ -2,6 +2,81 @@
 
 서울 주말 마라톤 교통통제로 인한 시민 불편을 기록·집계하고, 대책을 요구하며, 우회 정보를 제공하는 공익 웹사이트.
 
+---
+
+## 🚀 턴키 셋업 — 내가 해야 할 일 (이 순서대로)
+
+> 한 번만 세팅하면, 그 뒤로는 **하루 1회 자동 수집 → `/admin`에서 검토·게시**만 하면 됩니다.
+> ⚠️ 중요: **앱 배포만으로는 수집이 안 됩니다. 6번 cron 등록까지 해야 자동으로 돕니다.**
+> 그리고 수집은 staging까지만 — 사용자에게 보이려면 **`/admin`에서 "게시"를 눌러야** 합니다(틀린 정보 방지용 안전장치).
+
+### 0. 준비물 (계정·키)
+- [ ] Supabase 프로젝트
+- [ ] Anthropic API 키 (`ANTHROPIC_API_KEY`)
+- [ ] 호스팅(Vultr VPC 등) + 도메인(no-marathon.kr)
+- [ ] 임의의 긴 문자열 2개 직접 정하기: `AGENT_TRIGGER_SECRET`(수집 트리거용), `ADMIN_PASSCODE`(관리자 번호)
+
+### 1. (선택) 로컬에서 먼저 눈으로 확인 — 키 없이
+```bash
+npm install
+cp .env.example .env.local      # 기본 mock
+npm run dev                      # http://localhost:3000 , /admin 도 확인
+```
+
+### 2. Supabase 스키마 적용
+Supabase 대시보드 → SQL Editor에 아래 파일 내용을 **순서대로** 붙여넣고 실행:
+`supabase/migrations/0001_init.sql` → `0002_rls.sql` → `0003_views.sql` → `0004_add_region.sql` → `0005_control_zone_and_comment_channel.sql`
+→ Project Settings → API 에서 **URL / anon key / service_role key** 복사.
+
+### 3. 환경변수 채우기
+서버 secret(`.env.production` 등):
+```
+SUPABASE_SERVICE_ROLE_KEY=...
+ANTHROPIC_API_KEY=sk-ant-...
+AGENT_TRIGGER_SECRET=내가_정한_긴_문자열
+ADMIN_PASSCODE=내가_정한_관리자_번호
+DEVICE_HASH_SALT=아무거나_긴_문자열
+REPORT_INBOX_EMAIL=내메일@example.com        # 앱 불편신고 수신(선택)
+```
+빌드타임(공개) 값은 **빌드 시 주입**(아래 4번 build-arg):
+`NEXT_PUBLIC_APP_MODE=live`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+### 4. 빌드 & 실행 (Docker)
+```bash
+NEXT_PUBLIC_APP_MODE=live \
+NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co \
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ... \
+docker compose up -d --build
+curl http://localhost:3000/api/health        # {"mode":"live"} 확인
+```
+
+### 5. 도메인 + HTTPS
+nginx 리버스 프록시(`proxy_pass 127.0.0.1:3000`, `X-Forwarded-For` 전달) + `certbot --nginx -d no-marathon.kr` + DNS A레코드.
+(상세 명령: [docs/90_deploy-and-handover.md](docs/90_deploy-and-handover.md))
+
+### 6. ⏰ 자동 수집 cron 등록 (이걸 해야 자동으로 돕니다)
+서버에서 `crontab -e` 후 추가 (매일 04:00):
+```
+0 4 * * * curl -s -XPOST -H "x-agent-secret: 내가_정한_AGENT_TRIGGER_SECRET" https://no-marathon.kr/api/agent/collect >> /var/log/nm-agent.log 2>&1
+```
+
+### 7. 첫 수집 1회 수동 확인 (live 첫 동작 점검)
+```
+curl -XPOST -H "x-agent-secret: 내가_정한_secret" https://no-marathon.kr/api/agent/collect
+```
+→ `https://no-marathon.kr/admin` 접속 → 관리자 번호 입력 → **staging 항목이 보이면 성공.**
+
+---
+
+## ✅ 세팅 끝난 뒤, 내가 평소에 하는 일 (이게 전부)
+1. `https://no-marathon.kr/admin` 접속 → 관리자 번호 입력
+2. **검수 대기(staging)** 항목 확인 → 틀린 내용 있으면 수정 → **"게시"** 클릭
+3. 끝. (이미 게시된 정보가 바뀌었으면 거기서 수정하면 됨)
+
+> 잘못된 정보가 보이면 `/admin`에서 직접 고치거나, Supabase 대시보드에서 `marathons` 테이블을 직접 수정해도 됩니다.
+
+---
+
 ## 문서
 
 - 구현 로드맵: [PLAN.md](PLAN.md) — Phase 0~9 (`다음` 게이트 방식)
