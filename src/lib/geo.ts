@@ -49,3 +49,21 @@ export async function getHeuristicRegion(): Promise<string | null> {
     return null;
   }
 }
+
+/**
+ * 위치 권한을 적극 요청(브라우저 프롬프트 표시)해 대략 권역 반환.
+ * 우회로 공유처럼 "위치 공유한 사람만" 허용하는 흐름에서 사용.
+ */
+export async function requestRegionInteractive(): Promise<string | null> {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) {
+    return null;
+  }
+  return new Promise<string | null>((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) =>
+        resolve(coarseSeoulRegion(pos.coords.latitude, pos.coords.longitude)),
+      () => resolve(null),
+      { timeout: 7000, maximumAge: 600000 },
+    );
+  });
+}

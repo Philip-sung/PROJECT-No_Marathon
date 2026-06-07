@@ -255,7 +255,17 @@ function heavyDisruptions(count: number): DisruptionRow[] {
     '회기동학생',
     null,
   ];
-  const regions = ['도심', '강남', '강북', '서부', '동부', null];
+  // 길이 7(타임스탬프 주기 360과 서로소) → 최신 항목 문구/지역 쏠림 방지.
+  const regions = ['도심', '강남', '강북', '서부', '동부', '성동', null];
+  const notes = [
+    '버스가 30분째 안 와서 한참 기다렸어요.',
+    '길이 다 막혀서 평소 10분 거리를 40분 걸렸습니다.',
+    '택시도 안 잡히고 지하철역까지 한참 걸어갔어요.',
+    '병원 예약 시간을 놓칠 뻔했습니다.',
+    '아이 데리러 가는데 도로가 전부 통제됐어요.',
+    '우회 안내가 없어서 어디로 가야 할지 몰랐습니다.',
+    '출근길이 막혀 회사에 늦었습니다.',
+  ];
   const rows: DisruptionRow[] = [];
   for (let i = 0; i < count; i += 1) {
     const hh = String(6 + (i % 12)).padStart(2, '0');
@@ -265,12 +275,7 @@ function heavyDisruptions(count: number): DisruptionRow[] {
       marathon_id: HEAVY,
       device_hash: `heavy-d-${i}`,
       minutes_lost: 30 + ((i * 13) % 451),
-      note:
-        i % 3 === 0
-          ? '버스가 한참 안 옴'
-          : i % 3 === 1
-            ? '길이 다 막혀 한참 걸림'
-            : null,
+      note: notes[i % notes.length] ?? null,
       display_name: names[i % names.length] ?? null,
       region: regions[i % regions.length] ?? null,
       created_at: `2026-05-03T${hh}:${mm}:00+09:00`,
@@ -280,27 +285,44 @@ function heavyDisruptions(count: number): DisruptionRow[] {
 }
 
 function heavyComments(count: number): CommentRow[] {
-  const bodies = [
+  // 시민 목소리(voice) — 불편·요구.
+  const voiceBodies = [
     '주말마다 이러니 너무 힘듭니다.',
     '응급차는 어떻게 지나가나요? 대책이 필요합니다.',
     '우회 안내가 전혀 없어서 한참 헤맸어요.',
     '사전 공지라도 제대로 해주세요.',
     '버스가 30분 넘게 안 왔습니다.',
     '도심 통제 좀 분산해주세요.',
+    '교통 영향 분석부터 공개했으면 합니다.',
   ];
+  // 우회로 공유(detour) — 실제 우회 정보.
+  const detourBodies = [
+    '종각역에서 1호선 타고 시청 방면으로 우회했더니 빨랐어요.',
+    '광화문 통제구간은 안국역(3호선)으로 돌아가세요.',
+    '여의나루역(5호선) 환승이 가장 원활합니다.',
+    '간선버스 대신 지하철 환승을 추천해요.',
+    '시청 방면은 2호선이 그나마 덜 막힙니다.',
+    '을지로 쪽은 2·3호선 환승으로 우회 가능해요.',
+    '도심 진입은 포기하고 외곽 순환로로 도세요.',
+  ];
+  const detourRegions = ['도심', '강남', '강북', '서부', '동부'];
   const rows: CommentRow[] = [];
   for (let i = 0; i < count; i += 1) {
     const hh = String(8 + (i % 10)).padStart(2, '0');
     const mm = String(i % 60).padStart(2, '0');
+    const isDetour = i % 5 === 0;
     rows.push({
       id: randomUUID(),
       marathon_id: HEAVY,
       device_hash: `heavy-c-${i}`,
-      body: `${bodies[i % bodies.length] ?? ''} (#${i + 1})`,
+      body: isDetour
+        ? (detourBodies[i % detourBodies.length] ?? '')
+        : (voiceBodies[i % voiceBodies.length] ?? ''),
       like_count: i < 5 ? 120 - i * 18 : (i * 7) % 25,
-      // 5개마다 1개는 우회로 공유(detour) 채널.
-      channel: i % 5 === 0 ? 'detour' : 'voice',
-      region: i % 5 === 0 ? '도심' : null,
+      channel: isDetour ? 'detour' : 'voice',
+      region: isDetour
+        ? (detourRegions[i % detourRegions.length] ?? null)
+        : null,
       created_at: `2026-05-03T${hh}:${mm}:00+09:00`,
     });
   }

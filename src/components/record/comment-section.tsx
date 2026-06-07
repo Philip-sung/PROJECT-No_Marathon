@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { CommentPublic } from '@/lib/db/schema';
 import { LIMITS } from '@/lib/db/constants';
 import { orderCommentsForDisplay } from '@/lib/comments/order';
 import { submitComment, likeComment } from '@/lib/api/client';
 import { formatRelativeKo } from '@/lib/format';
-import { getHeuristicRegion } from '@/lib/geo';
+import { getHeuristicRegion, requestRegionInteractive } from '@/lib/geo';
 import { useToast } from '@/components/ui/toast';
 
 const PAGE = 10;
@@ -21,6 +21,7 @@ export function CommentSection({
   placeholder = '무기명으로 한마디 남겨주세요.',
   captureRegion = false,
   showRegion = false,
+  requireLocation = false,
 }: {
   marathonId: string;
   comments: CommentPublic[];
@@ -30,43 +31,54 @@ export function CommentSection({
   placeholder?: string;
   captureRegion?: boolean;
   showRegion?: boolean;
+  /** true 면 위치 공유(권역 확인)한 사람만 작성 가능. */
+  requireLocation?: boolean;
 }) {
   const toast = useToast();
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
   const [liking, setLiking] = useState<string | null>(null);
   const [visible, setVisible] = useState(PAGE);
+  const [region, setRegion] = useState<string | null>(null);
+  const [regionChecked, setRegionChecked] = useState(false);
+  const [locating, setLocating] = useState(false);
+
+  // requireLocation 이면 마운트 시 이미 허용된 권한으로 권역을 조용히 확인.
+  useEffect(() => {
+    if (!requireLocation) {
+      setRegionChecked(true);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const r = await getHeuristicRegion();
+      if (!cancelled) {
+        setRegion(r);
+        setRegionChecked(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [requireLocation]);
 
   const scoped = comments.filter((c) => c.channel === channel);
   const ordered = orderCommentsForDisplay(scoped, { pageSize: 1000 });
   const shown = ordered.slice(0, visible);
+  const canWrite = !requireLocation || Boolean(region);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const text = body.trim();
-    if (text.length < LIMITS.commentMin) {
-      toast('error', '내용을 입력해 주세요.');
-      return;
-    }
-    setBusy(true);
+  async function shareLocation() {
+    setLocating(true);
     try {
-      const region = captureRegion ? await getHeuristicRegion() : null;
-      await submitComment({
-        marathon_id: marathonId,
-        body: text,
-        channel,
-        region,
-      });
-      setBody('');
-      toast('success', '등록되었습니다.');
-      onChanged();
-    } catch (err) {
-      toast(
-        'error',
-        err instanceof Error ? err.message : '등록에 실패했습니다.',
-      );
+      const r = await requestRegionInteractive();
+      if (r) {
+        setRegion(r);
+        toast('success', `${r} 권역으로 확인되었습니다.`);
+      } else {
+        toast('error', '위치 권한이 필요합니다.');
+      }
     } finally {
-      setBusy(false);
+      setLocating(false);
     }
   }
 
@@ -82,39 +94,93 @@ export function CommentSection({
     }
   }
 
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const text = body.trim();
+    if (text.length < LIMITS.commentMin) {
+      toast('error', '내용을 입력해 주세요.');
+      return;
+    }
+    setBusy(true);
+    try {
+      let useRegion: string | null = region;
+      if (!requireLocation) {
+        useRegion = captureRegion ? await getHeuristicRegion() : null;
+      }
+      await submitComment({
+        marathon_id: marathonId,
+        body: text,
+        channel,
+        region: useRegion,
+      });
+      setBody('');
+      toast('success', '등록되었습니다.');
+      onChanged();
+    } catch (err) {
+      toast(
+        'error',
+        err instanceof Error ? err.message : '등록에 실패했습니다.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <section>
       <div className="flex items-baseline justify-between">
         <h2 className="text-lg font-bold">{title}</h2>
         <span className="text-xs text-muted">인기 + 최신순</span>
       </div>
-      <form onSubmit={onSubmit} className="mt-4">
-        <textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          maxLength={LIMITS.commentMax}
-          rows={3}
-          placeholder={placeholder}
-          className="w-full rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-fg placeholder:text-muted/50 transition focus:border-accent/50"
-        />
-        <motion.button
-          type="submit"
-          whileTap={{ scale: 0.98 }}
-          disabled={busy}
-          className="mt-2 rounded-full bg-accent px-5 py-2 text-sm font-semibold text-bg transition hover:shadow-glow disabled:opacity-50"
-        >
-          {busy
-            ? '등록 중…'
-            : channel === 'detour'
-              ? '우회로 공유'
-              : '댓글 남기기'}
-        </motion.button>
-        {captureRegion ? (
-          <p className="mt-1.5 text-xs text-muted/70">
-            위치 권한을 허용하면 대략적인 위치가 함께 표시됩니다(선택).
-          </p>
-        ) : null}
-      </form>
+
+      {/* 작성 영역: requireLocation 이면 위치 공유한 사람만 */}
+      {requireLocation && regionChecked && !canWrite ? (
+        <div className="glass mt-4 rounded-2xl p-5 text-center text-sm text-muted">
+          위치를 공유하면 우회로 관련 내용을 공유할 수 있습니다.
+          <div>
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.97 }}
+              onClick={shareLocation}
+              disabled={locating}
+              className="mt-3 rounded-full bg-accent px-5 py-2 text-sm font-semibold text-bg transition hover:shadow-glow disabled:opacity-50"
+            >
+              {locating ? '위치 확인 중…' : '위치 공유하기'}
+            </motion.button>
+          </div>
+        </div>
+      ) : requireLocation && !regionChecked ? (
+        <p className="mt-4 text-sm text-muted">위치 확인 중…</p>
+      ) : (
+        <form onSubmit={onSubmit} className="mt-4">
+          {requireLocation && region ? (
+            <p className="mb-2 text-xs text-accent">
+              현재 위치: {region} 권역 · 비슷한 위치의 시민과 우회로를
+              공유합니다
+            </p>
+          ) : null}
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            maxLength={LIMITS.commentMax}
+            rows={3}
+            placeholder={placeholder}
+            className="w-full rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-fg placeholder:text-muted/50 transition focus:border-accent/50"
+          />
+          <motion.button
+            type="submit"
+            whileTap={{ scale: 0.98 }}
+            disabled={busy}
+            className="mt-2 rounded-full bg-accent px-5 py-2 text-sm font-semibold text-bg transition hover:shadow-glow disabled:opacity-50"
+          >
+            {busy
+              ? '등록 중…'
+              : channel === 'detour'
+                ? '우회로 공유'
+                : '댓글 남기기'}
+          </motion.button>
+        </form>
+      )}
 
       <ul className="mt-5 space-y-2">
         {shown.length === 0 ? (

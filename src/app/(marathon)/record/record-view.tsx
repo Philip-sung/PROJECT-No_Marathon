@@ -138,14 +138,20 @@ export function RecordView() {
                       {formatDurationKo(d.minutes_lost)}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-xs text-muted">
+                  {d.note ? (
+                    <p className="mt-1.5 text-sm leading-relaxed text-fg/90">
+                      “{d.note}”
+                    </p>
+                  ) : (
+                    <p className="mt-1.5 text-sm text-muted/50">
+                      (남긴 내용 없음)
+                    </p>
+                  )}
+                  <p className="mt-1.5 text-xs text-muted">
                     {[selected.area, d.region, formatRelativeKo(d.created_at)]
                       .filter(Boolean)
                       .join(' · ')}
                   </p>
-                  {d.note ? (
-                    <p className="mt-1 text-sm text-muted/90">{d.note}</p>
-                  ) : null}
                 </motion.li>
               ))}
             </AnimatePresence>

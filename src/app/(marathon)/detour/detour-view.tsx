@@ -149,7 +149,7 @@ export function DetourView() {
         channel="detour"
         title="우회로 공유"
         placeholder="이 구간은 이렇게 우회하세요 (예: 종각역에서 1호선 이용)"
-        captureRegion
+        requireLocation
         showRegion
       />
 
