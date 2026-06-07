@@ -3,6 +3,7 @@ import Script from 'next/script';
 import './globals.css';
 import { SiteHeader } from '@/components/site-header';
 import { Analytics } from '@/components/analytics';
+import { ToastProvider } from '@/components/ui/toast';
 import { env } from '@/lib/env';
 
 // SEO/SNS 확산 기반(여론 조성 목적). Phase 3에서 OG 이미지·페이지별 메타 확장.
@@ -32,12 +33,14 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ko">
-      <body className="flex min-h-screen flex-col">
-        <SiteHeader />
-        <div className="flex-1">{children}</div>
-        <footer className="border-t border-gray-200 py-6 text-center text-xs text-gray-400">
-          no-marathon.kr · 시민 교통 불편 기록 프로젝트
-        </footer>
+      <body className="flex min-h-screen flex-col font-sans">
+        <ToastProvider>
+          <SiteHeader />
+          <div className="flex-1">{children}</div>
+          <footer className="border-t border-line py-8 text-center text-xs text-muted">
+            no-marathon.kr · 시민 교통 불편 기록 프로젝트
+          </footer>
+        </ToastProvider>
         <Analytics />
         {env.NEXT_PUBLIC_ADSENSE_CLIENT ? (
           <Script

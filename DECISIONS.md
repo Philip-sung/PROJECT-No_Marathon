@@ -41,7 +41,13 @@
   (v_*_public)로만 anon 노출. 뷰는 owner 권한 실행(security_invoker off)으로 RLS 우회+컬럼필터.
 - 근거: 익명 식별 해시를 외부에 노출하지 않기 위함(프라이버시/어뷰즈 방지).
 
-## ADR-011 · 관측성·가드레일·트래픽 — 2026-06-07
+## ADR-012 · 디자인: 다크 미래지향 + 모션 — 2026-06-07
+- 결정: 다크 테마(near-black + 라디얼 글로우 + 미세 그리드), 네온 액센트(cyan/violet/rose),
+  Pretendard, glassmorphism. 인터랙션은 framer-motion + 커스텀 CountUp(rAF).
+- 핵심 인터랙션: 분노 페이지 합계 히어로 카운트업(글로우), 헤더 active layoutId pill,
+  리스트/카드 등장·hover 모션, 선택 모달 AnimatePresence, 제출 토스트, 좋아요 탭 모션.
+- 트레이드오프: framer-motion 으로 First Load ~50kB↑(104→159kB) — 인터랙티브 요구에 부합 판단.
+- 홈은 서버 fetch(SSR/SEO) → 클라이언트 HomeView 모션 분리.
 - 관측성: 구조적 JSON 로거, /api/health, /api/agent/metrics(ledger 파생), notify(Slack webhook+로그)=external escalation.
 - 어뷰즈 방어: 인메모리 고정윈도우 rate limit(기기 기준, 쓰기 라우트, 초과 429). 다중 인스턴스 시 Redis 로 교체.
 - 트래픽 스파이크: /api/summary 에 s-maxage=10 + stale-while-revalidate=30(edge/CDN 캐시).

@@ -25,7 +25,7 @@ export function AdSlot({ label = '광고 영역' }: { label?: string }) {
 
   if (!client) {
     return (
-      <div className="my-8 flex h-24 items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 text-xs text-gray-300">
+      <div className="my-2 flex h-24 items-center justify-center rounded-2xl border border-dashed border-line text-xs text-muted/50">
         {label} (AdSense placeholder)
       </div>
     );
