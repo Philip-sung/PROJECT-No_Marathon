@@ -3,9 +3,10 @@ node_modules
 .git
 .github
 npm-debug.log*
+# secret hygiene: 모든 .env* 를 이미지에서 제외(.env.production 등 실키 유출 방지). 예시만 허용.
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 *.md
 docs
 supabase/.branches

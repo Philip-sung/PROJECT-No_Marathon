@@ -1,0 +1,56 @@
+name: Build & Push Image to GHCR
+
+# 같은 쿠버네티스 클러스터(PROJECT-Obtopus / PROJECT-OIPMonorepo 와 동일)에 배포할
+# 단일 Next.js(standalone) 웹 이미지를 GHCR(ghcr.io/philip-sung)로 빌드·푸시한다.
+#
+# ── 사전 설정(GitHub 레포 Settings) ────────────────────────────────
+# NEXT_PUBLIC_* 는 next build 시점에 번들에 인라인되므로 반드시 build-arg 로 주입한다.
+#   Settings → Secrets and variables → Actions
+#   · Secrets:   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
+#   · Variables: NEXT_PUBLIC_APP_MODE(미설정 시 live), NEXT_PUBLIC_ADSENSE_CLIENT
+# 서버 전용 secret(SUPABASE_SERVICE_ROLE_KEY/ANTHROPIC_API_KEY/AGENT_TRIGGER_SECRET 등)은
+# 빌드가 아니라 런타임에 주입한다 → 클러스터 Secret `no-marathon-env` (k8s/README.md 참조).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE: ghcr.io/philip-sung/no-marathon-image
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:edge
+            ${{ env.IMAGE }}:latest
+          build-args: |
+            NEXT_PUBLIC_APP_MODE=${{ vars.NEXT_PUBLIC_APP_MODE || 'live' }}
+            NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+            NEXT_PUBLIC_ADSENSE_CLIENT=${{ vars.NEXT_PUBLIC_ADSENSE_CLIENT }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
