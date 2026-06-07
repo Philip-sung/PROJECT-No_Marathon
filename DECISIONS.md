@@ -41,6 +41,13 @@
   (v_*_public)로만 anon 노출. 뷰는 owner 권한 실행(security_invoker off)으로 RLS 우회+컬럼필터.
 - 근거: 익명 식별 해시를 외부에 노출하지 않기 위함(프라이버시/어뷰즈 방지).
 
+## ADR-013 · 우회 지도 + 통제정보 + 우회로 공유 — 2026-06-07
+- 지도: Leaflet + OpenStreetMap(키 불필요, dev 즉시 동작). 동적 import(SSR 회피), circleMarker로 아이콘 에셋 회피.
+- 통제구간: marathons.control_zone(jsonb: center/radius_m/polygon), 통제시간: start_time/end_time → formatControlPeriod.
+  둘 다 없으면 "통제구간/시간 정보를 알 수 없습니다". AI 수집(NormalizedMarathon)이 채움(0005 마이그레이션).
+- 우회로 공유: comments.channel('voice'|'detour') + region. detour 채널은 대략 위치(휴리스틱) 함께 표시.
+- 대안 기각: Naver/Kakao 지도 JS(앱키+도메인 화이트리스트 → 턴키 저해). 외부 길찾기는 링크 유지.
+
 ## ADR-012 · 디자인: 다크 미래지향 + 모션 — 2026-06-07
 - 결정: 다크 테마(near-black + 라디얼 글로우 + 미세 그리드), 네온 액센트(cyan/violet/rose),
   Pretendard, glassmorphism. 인터랙션은 framer-motion + 커스텀 CountUp(rAF).

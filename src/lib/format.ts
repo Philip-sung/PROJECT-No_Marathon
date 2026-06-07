@@ -19,6 +19,41 @@ export function formatNumber(n: number): string {
   return n.toLocaleString('ko-KR');
 }
 
+/** 통제 시간대 표시. 예: "5월 3일 (토) 07:00 ~ 14:00". 정보 없으면 null. */
+export function formatControlPeriod(
+  start: string | null,
+  end: string | null,
+): string | null {
+  const only = start ?? end;
+  if (!only) {
+    return null;
+  }
+  const dateOpts: Intl.DateTimeFormatOptions = {
+    month: 'long',
+    day: 'numeric',
+    weekday: 'short',
+    timeZone: 'Asia/Seoul',
+  };
+  const timeOpts: Intl.DateTimeFormatOptions = {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'Asia/Seoul',
+  };
+  const dateStr = new Intl.DateTimeFormat('ko-KR', dateOpts).format(
+    new Date(only),
+  );
+  if (start && end) {
+    const ts = new Intl.DateTimeFormat('ko-KR', timeOpts).format(
+      new Date(start),
+    );
+    const te = new Intl.DateTimeFormat('ko-KR', timeOpts).format(new Date(end));
+    return `${dateStr} ${ts} ~ ${te}`;
+  }
+  const ts = new Intl.DateTimeFormat('ko-KR', timeOpts).format(new Date(only));
+  return `${dateStr} ${ts} 부터`;
+}
+
 /** ISO 시각을 상대시간으로. 예: "방금 전", "5분 전", "3시간 전", "2일 전", 그 이상은 날짜. */
 export function formatRelativeKo(
   iso: string,

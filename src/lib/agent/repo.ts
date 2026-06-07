@@ -88,6 +88,8 @@ export async function stageMarathon(
     .insert({
       name: n.name,
       event_date: n.event_date,
+      start_time: n.start_time ?? null,
+      end_time: n.end_time ?? null,
       area: n.area,
       lat: n.lat ?? null,
       lng: n.lng ?? null,
@@ -96,6 +98,7 @@ export async function stageMarathon(
       organizer_contact: n.organizer_contact ?? null,
       organizer_email: n.organizer_email ?? null,
       detour_info: n.detour_info,
+      control_zone: n.control_zone ?? {},
       source: n.source ?? 'ai',
       content_hash: contentHash,
       status: 'staging',

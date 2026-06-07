@@ -25,6 +25,7 @@ export interface MarathonRow {
   organizer_contact: string | null;
   organizer_email: string | null;
   detour_info: Record<string, unknown>;
+  control_zone: Record<string, unknown>;
   source: string | null;
   content_hash: string | null;
   status: 'staging' | 'published' | 'archived';
@@ -46,6 +47,8 @@ export interface CommentRow {
   device_hash: string;
   body: string;
   like_count: number;
+  channel: 'voice' | 'detour';
+  region: string | null;
   created_at: string;
 }
 export interface MockDataset {
@@ -78,6 +81,10 @@ function baseMarathons(): MarathonRow[] {
         subway: ['1호선 우회', '5호선 광화문역 출구 일부 통제'],
         bus: ['간선 03번 임시우회'],
       },
+      control_zone: {
+        center: { lat: 37.5759, lng: 126.9769 },
+        radius_m: 1500,
+      },
       source: 'seed',
       content_hash: 'seed-0',
       status: 'published',
@@ -97,6 +104,10 @@ function baseMarathons(): MarathonRow[] {
       organizer_contact: null,
       organizer_email: 'run2@example.org',
       detour_info: { subway: ['5호선 여의나루역 이용'], bus: [] },
+      control_zone: {
+        center: { lat: 37.5285, lng: 126.9325 },
+        radius_m: 1200,
+      },
       source: 'seed',
       content_hash: 'seed-1',
       status: 'published',
@@ -158,6 +169,8 @@ function baseComments(): CommentRow[] {
       device_hash: 'seed-c-1',
       body: '주말마다 이러니 너무 힘듭니다. 사전 공지라도 제대로 해줬으면.',
       like_count: 12,
+      channel: 'voice',
+      region: null,
       created_at: '2026-04-19T11:00:00+09:00',
     },
     {
@@ -166,6 +179,8 @@ function baseComments(): CommentRow[] {
       device_hash: 'seed-c-2',
       body: '우회로 안내가 전혀 없어서 한참 헤맸어요.',
       like_count: 5,
+      channel: 'voice',
+      region: null,
       created_at: '2026-04-19T11:30:00+09:00',
     },
     {
@@ -174,7 +189,29 @@ function baseComments(): CommentRow[] {
       device_hash: 'seed-c-3',
       body: '응급차는 어떻게 지나가나요? 대책이 필요합니다.',
       like_count: 0,
+      channel: 'voice',
+      region: null,
       created_at: '2026-04-19T12:00:00+09:00',
+    },
+    {
+      id: 'bbbbbbbb-0000-4000-8000-000000000001',
+      marathon_id: M1,
+      device_hash: 'seed-d-1',
+      body: '광화문 막히면 종각역에서 1호선 타고 시청 쪽으로 도세요. 버스보다 빠릅니다.',
+      like_count: 8,
+      channel: 'detour',
+      region: '도심',
+      created_at: '2026-04-19T09:40:00+09:00',
+    },
+    {
+      id: 'bbbbbbbb-0000-4000-8000-000000000002',
+      marathon_id: M1,
+      device_hash: 'seed-d-2',
+      body: '을지로 방면은 2호선 환승이 그나마 덜 막혔어요.',
+      like_count: 3,
+      channel: 'detour',
+      region: '도심',
+      created_at: '2026-04-19T10:05:00+09:00',
     },
   ];
 }
@@ -185,8 +222,8 @@ function heavyMarathon(): MarathonRow {
     id: HEAVY,
     name: '[테스트] 대규모 마라톤',
     event_date: '2026-05-03',
-    start_time: null,
-    end_time: null,
+    start_time: '2026-05-03T07:00:00+09:00',
+    end_time: '2026-05-03T14:00:00+09:00',
     area: '서울 도심 전역',
     lat: 37.5665,
     lng: 126.978,
@@ -197,6 +234,10 @@ function heavyMarathon(): MarathonRow {
     detour_info: {
       subway: ['도심 전 노선 우회 권장', '1·2호선 환승 지연'],
       bus: ['도심 통과 간선 다수 지연·우회'],
+    },
+    control_zone: {
+      center: { lat: 37.5665, lng: 126.978 },
+      radius_m: 2500,
     },
     source: 'seed-heavy',
     content_hash: 'seed-heavy',
@@ -257,6 +298,9 @@ function heavyComments(count: number): CommentRow[] {
       device_hash: `heavy-c-${i}`,
       body: `${bodies[i % bodies.length] ?? ''} (#${i + 1})`,
       like_count: i < 5 ? 120 - i * 18 : (i * 7) % 25,
+      // 5개마다 1개는 우회로 공유(detour) 채널.
+      channel: i % 5 === 0 ? 'detour' : 'voice',
+      region: i % 5 === 0 ? '도심' : null,
       created_at: `2026-05-03T${hh}:${mm}:00+09:00`,
     });
   }
@@ -299,8 +343,11 @@ export const MOCK_RESEARCH: Record<string, NormalizedMarathon> = {
     name: '서울 도심 봄 마라톤',
     event_date: '2026-04-26',
     area: '광화문·종로 일대',
+    start_time: '2026-04-26T07:00:00+09:00',
+    end_time: '2026-04-26T13:00:00+09:00',
     lat: 37.5759,
     lng: 126.9769,
+    control_zone: { center: { lat: 37.5759, lng: 126.9769 }, radius_m: 1500 },
     organizer_name: '서울러닝협회',
     organizer_url: 'https://example.org/seoul-spring',
     organizer_contact: '02-123-4567',
@@ -315,8 +362,11 @@ export const MOCK_RESEARCH: Record<string, NormalizedMarathon> = {
     name: '한강 가을 마라톤',
     event_date: '2026-10-18',
     area: '여의도·마포대교 일대',
+    start_time: '2026-10-18T08:00:00+09:00',
+    end_time: '2026-10-18T12:00:00+09:00',
     lat: 37.5285,
     lng: 126.9325,
+    control_zone: { center: { lat: 37.5285, lng: 126.9325 }, radius_m: 1200 },
     organizer_name: '한강마라톤조직위',
     organizer_url: 'https://example.org/hangang',
     organizer_contact: null,

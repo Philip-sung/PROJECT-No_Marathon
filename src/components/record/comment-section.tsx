@@ -7,6 +7,7 @@ import { LIMITS } from '@/lib/db/constants';
 import { orderCommentsForDisplay } from '@/lib/comments/order';
 import { submitComment, likeComment } from '@/lib/api/client';
 import { formatRelativeKo } from '@/lib/format';
+import { getHeuristicRegion } from '@/lib/geo';
 import { useToast } from '@/components/ui/toast';
 
 const PAGE = 10;
@@ -15,10 +16,20 @@ export function CommentSection({
   marathonId,
   comments,
   onChanged,
+  channel = 'voice',
+  title = '시민들의 목소리',
+  placeholder = '무기명으로 한마디 남겨주세요.',
+  captureRegion = false,
+  showRegion = false,
 }: {
   marathonId: string;
   comments: CommentPublic[];
   onChanged: () => void;
+  channel?: 'voice' | 'detour';
+  title?: string;
+  placeholder?: string;
+  captureRegion?: boolean;
+  showRegion?: boolean;
 }) {
   const toast = useToast();
   const [body, setBody] = useState('');
@@ -26,7 +37,8 @@ export function CommentSection({
   const [liking, setLiking] = useState<string | null>(null);
   const [visible, setVisible] = useState(PAGE);
 
-  const ordered = orderCommentsForDisplay(comments, { pageSize: 1000 });
+  const scoped = comments.filter((c) => c.channel === channel);
+  const ordered = orderCommentsForDisplay(scoped, { pageSize: 1000 });
   const shown = ordered.slice(0, visible);
 
   async function onSubmit(e: React.FormEvent) {
@@ -38,7 +50,13 @@ export function CommentSection({
     }
     setBusy(true);
     try {
-      await submitComment({ marathon_id: marathonId, body: text });
+      const region = captureRegion ? await getHeuristicRegion() : null;
+      await submitComment({
+        marathon_id: marathonId,
+        body: text,
+        channel,
+        region,
+      });
       setBody('');
       toast('success', '등록되었습니다.');
       onChanged();
@@ -67,7 +85,7 @@ export function CommentSection({
   return (
     <section>
       <div className="flex items-baseline justify-between">
-        <h2 className="text-lg font-bold">시민들의 목소리</h2>
+        <h2 className="text-lg font-bold">{title}</h2>
         <span className="text-xs text-muted">인기 + 최신순</span>
       </div>
       <form onSubmit={onSubmit} className="mt-4">
@@ -76,7 +94,7 @@ export function CommentSection({
           onChange={(e) => setBody(e.target.value)}
           maxLength={LIMITS.commentMax}
           rows={3}
-          placeholder="무기명으로 한마디 남겨주세요."
+          placeholder={placeholder}
           className="w-full rounded-2xl border border-line bg-white/[0.03] px-4 py-3 text-fg placeholder:text-muted/50 transition focus:border-accent/50"
         />
         <motion.button
@@ -85,14 +103,25 @@ export function CommentSection({
           disabled={busy}
           className="mt-2 rounded-full bg-accent px-5 py-2 text-sm font-semibold text-bg transition hover:shadow-glow disabled:opacity-50"
         >
-          {busy ? '등록 중…' : '댓글 남기기'}
+          {busy
+            ? '등록 중…'
+            : channel === 'detour'
+              ? '우회로 공유'
+              : '댓글 남기기'}
         </motion.button>
+        {captureRegion ? (
+          <p className="mt-1.5 text-xs text-muted/70">
+            위치 권한을 허용하면 대략적인 위치가 함께 표시됩니다(선택).
+          </p>
+        ) : null}
       </form>
 
       <ul className="mt-5 space-y-2">
         {shown.length === 0 ? (
           <li className="glass rounded-2xl py-8 text-center text-sm text-muted">
-            첫 번째 목소리를 남겨주세요.
+            {channel === 'detour'
+              ? '첫 우회로 정보를 공유해 주세요.'
+              : '첫 번째 목소리를 남겨주세요.'}
           </li>
         ) : (
           <AnimatePresence initial={false} mode="popLayout">
@@ -108,7 +137,10 @@ export function CommentSection({
               >
                 <p className="text-sm leading-relaxed">{c.body}</p>
                 <div className="mt-2.5 flex items-center justify-between text-xs text-muted">
-                  <span>{formatRelativeKo(c.created_at)}</span>
+                  <span>
+                    {showRegion && c.region ? `${c.region} · ` : ''}
+                    {formatRelativeKo(c.created_at)}
+                  </span>
                   <motion.button
                     type="button"
                     whileTap={{ scale: 0.85 }}

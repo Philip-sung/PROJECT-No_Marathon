@@ -62,6 +62,8 @@ export async function writeComment(
     marathon_id: input.marathon_id,
     device_hash: deviceHash,
     body: input.body,
+    channel: input.channel,
+    region: input.region ?? null,
   });
   if (error) {
     throw new Error(`댓글 등록 실패: ${error.message}`);

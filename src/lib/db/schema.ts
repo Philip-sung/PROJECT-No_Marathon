@@ -22,6 +22,7 @@ export const MarathonSchema = z.object({
   organizer_contact: z.string().nullable(),
   organizer_email: z.string().nullable(),
   detour_info: z.record(z.string(), z.unknown()),
+  control_zone: z.record(z.string(), z.unknown()).default({}),
   created_at: z.string(),
 });
 export type Marathon = z.infer<typeof MarathonSchema>;
@@ -42,6 +43,8 @@ export const CommentPublicSchema = z.object({
   marathon_id: z.string().uuid(),
   body: z.string(),
   like_count: z.number().int(),
+  channel: z.enum(['voice', 'detour']).default('voice'),
+  region: z.string().nullable().default(null),
   created_at: z.string(),
 });
 export type CommentPublic = z.infer<typeof CommentPublicSchema>;
@@ -73,6 +76,8 @@ export type DisruptionInput = z.infer<typeof DisruptionInputSchema>;
 export const CommentInputSchema = z.object({
   marathon_id: z.string().uuid(),
   body: z.string().min(LIMITS.commentMin).max(LIMITS.commentMax),
+  channel: z.enum(['voice', 'detour']).default('voice'),
+  region: z.string().max(40).optional().nullable(),
 });
 export type CommentInput = z.infer<typeof CommentInputSchema>;
 

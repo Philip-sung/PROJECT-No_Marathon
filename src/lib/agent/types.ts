@@ -11,12 +11,22 @@ export const DetourInfoSchema = z.object({
   note: z.string().optional(),
 });
 
+export const ControlZoneSchema = z.object({
+  center: z.object({ lat: z.number(), lng: z.number() }).optional(),
+  radius_m: z.number().positive().max(20000).optional(),
+  polygon: z.array(z.tuple([z.number(), z.number()])).optional(),
+});
+export type ControlZone = z.infer<typeof ControlZoneSchema>;
+
 export const NormalizedMarathonSchema = z.object({
   name: z.string().min(1),
   event_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD 형식'),
   area: z.string().min(1),
+  start_time: z.string().nullable().optional(),
+  end_time: z.string().nullable().optional(),
   lat: z.number().nullable().optional(),
   lng: z.number().nullable().optional(),
+  control_zone: ControlZoneSchema.optional(),
   organizer_name: z.string().nullable().optional(),
   organizer_url: z.string().nullable().optional(),
   organizer_contact: z.string().nullable().optional(),

@@ -77,6 +77,8 @@ function toPublicComment(r: CommentRow): CommentPublic {
     marathon_id: r.marathon_id,
     body: r.body,
     like_count: r.like_count,
+    channel: r.channel,
+    region: r.region,
     created_at: r.created_at,
   };
 }
@@ -132,6 +134,7 @@ function toPublicMarathon(r: MarathonRow): Marathon {
     organizer_contact: r.organizer_contact,
     organizer_email: r.organizer_email,
     detour_info: r.detour_info,
+    control_zone: r.control_zone,
     created_at: r.created_at,
   };
 }
@@ -187,8 +190,8 @@ export function addStagingMarathon(
     id,
     name: n.name,
     event_date: n.event_date,
-    start_time: null,
-    end_time: null,
+    start_time: n.start_time ?? null,
+    end_time: n.end_time ?? null,
     area: n.area,
     lat: n.lat ?? null,
     lng: n.lng ?? null,
@@ -197,6 +200,7 @@ export function addStagingMarathon(
     organizer_contact: n.organizer_contact ?? null,
     organizer_email: n.organizer_email ?? null,
     detour_info: n.detour_info,
+    control_zone: n.control_zone ?? {},
     source: n.source ?? 'ai',
     content_hash: contentHash,
     status: 'staging',
@@ -325,7 +329,12 @@ export function upsertDisruption(
 }
 
 export function addComment(
-  input: { marathon_id: string; body: string },
+  input: {
+    marathon_id: string;
+    body: string;
+    channel?: 'voice' | 'detour';
+    region?: string | null;
+  },
   deviceHash: string,
   nowIso: string,
 ): void {
@@ -334,6 +343,8 @@ export function addComment(
     marathon_id: input.marathon_id,
     body: input.body,
     like_count: 0,
+    channel: input.channel ?? 'voice',
+    region: input.region ?? null,
     created_at: nowIso,
     device_hash: deviceHash,
   });
