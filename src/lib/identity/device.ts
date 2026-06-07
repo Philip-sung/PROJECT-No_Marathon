@@ -39,3 +39,15 @@ export function extractClientIp(headers: Headers): string | null {
   }
   return headers.get('x-real-ip');
 }
+
+/**
+ * 요청 헤더로부터 device_hash 계산. 클라이언트가 보내는 x-device-fp(로컬 저장
+ * 난수)를 핑거프린트로 함께 사용해 1인 1회 휴리스틱을 강화한다.
+ */
+export function deviceHashFromRequest(headers: Headers): string {
+  return computeDeviceHash({
+    ip: extractClientIp(headers),
+    userAgent: headers.get('user-agent'),
+    fingerprint: headers.get('x-device-fp'),
+  });
+}
