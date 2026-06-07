@@ -88,6 +88,7 @@ curl -XPOST -H "x-agent-secret: 내가_정한_secret" https://no-marathon.kr/api
 - 의사결정: [DECISIONS.md](DECISIONS.md)
 - 빌드 에이전트 기준: [SOUL.md](SOUL.md)
 - 방향 리서치: [docs/00_direction-report.md](docs/00_direction-report.md)
+- 클러스터 배포(GHCR+k8s): [k8s/README.md](k8s/README.md) — Obtopus/OIP 동일 클러스터, 값 취득처·등록·배포 절차
 
 ## 스택
 
