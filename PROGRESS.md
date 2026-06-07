@@ -2,15 +2,16 @@
 
 > 매 Phase 갱신. 신뢰 출처(context rot 방어). last-checked 기준 최신 상태만 유지하고 과거는 ARCHIVE.md로 compaction.
 
-last-checked: 2026-06-07 (Phase 2 완료)
+last-checked: 2026-06-07 (Phase 3 완료)
 
 ## Current
-- Phase: **Phase 2 완료, Phase 3 대기**
-- 다음 액션: 사용자 `다음` → Phase 3(공유 레이아웃 & 마라톤 선택 컨텍스트) 시작
-- 방향 확정: dual-track (ADR-003). 쓰기=서버경유(ADR-007), 공개읽기=뷰(ADR-008).
+- Phase: **Phase 3 완료, Phase 4 대기**
+- 다음 액션: 사용자 `다음` → Phase 4(페이지 ① 취지) 시작
+- 방향 확정: dual-track (ADR-003). 쓰기=서버경유(ADR-007), 공개읽기=뷰(ADR-008), 선택 URL동기화(ADR-009).
 - 미결: 취지 페이지(Phase 4) "여론 기반 대책" 데이터 모델 — 정적/별도필드 여부 Phase 4에서 결정.
 - 주의: SQL 은 실DB 미적용(로컬 psql/supabase CLI 없음). Supabase 프로젝트 연결 시 적용.
         mock fixture 를 z.infer 타입으로 강제해 스키마-목 정합성은 tsc 로 검증함.
+- 라우트: / (취지) · /record (불편기록) · /detour (우회안내). (marathon) 그룹이 선택 공유.
 
 ## Done
 - [x] PDF(TR-2026-04) 분석 + 4-Layer/4-Tier/품질기법 매핑
@@ -21,9 +22,11 @@ last-checked: 2026-06-07 (Phase 2 완료)
       검증: typecheck·lint·build·format 전부 통과
 - [x] Phase 2 — 데이터 모델(7테이블+뷰+RLS), Zod 도메인 스키마, 과도입력 필터, 기기해시,
       mock fixture 정합. 채점 8.5/10. 검증: typecheck·lint·build·format 통과
+- [x] Phase 3 — 글로벌 헤더(3메뉴), 마라톤 선택 컨텍스트(시간+위치 최근접, 모달, URL동기화),
+      (marathon) 그룹 공유, per-page OG/SEO, SSR 복구. 채점 9/10. 검증: 게이트 통과 + 런타임 스모크
 
-## Queue (Phase 3 → 9)
-- [ ] Phase 3 — 공유 레이아웃 & 마라톤 선택 컨텍스트
+## Queue (Phase 4 → 9)
+- [ ] Phase 4 — 페이지 ① 취지
 - [ ] Phase 3 — 공유 레이아웃 & 마라톤 선택 컨텍스트
 - [ ] Phase 4 — 페이지 ① 취지
 - [ ] Phase 5 — 페이지 ② 분노 해소 집계 (메인)

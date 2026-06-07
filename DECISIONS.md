@@ -40,3 +40,11 @@
 - 결정: disruptions/comments 등은 베이스 SELECT 차단, device_hash 를 제외한 뷰
   (v_*_public)로만 anon 노출. 뷰는 owner 권한 실행(security_invoker off)으로 RLS 우회+컬럼필터.
 - 근거: 익명 식별 해시를 외부에 노출하지 않기 위함(프라이버시/어뷰즈 방지).
+
+## ADR-009 · 마라톤 선택: URL ?m 동기화 시 useSearchParams 회피 — 2026-06-07
+- 결정: MarathonProvider 는 useSearchParams 대신 마운트 후 window.location 에서 ?m 을 읽고,
+  변경 시 router.replace 로 URL 갱신. (marathon) 레이아웃의 Suspense 제거.
+- 근거: useSearchParams 는 Suspense 하위 전체를 클라이언트 전용 렌더로 전환시켜 /record·
+  /detour 본문이 SSR HTML 에서 누락됨(SEO 손실, 빌드 스모크로 확인). window 직접 읽기로 SSR 복구.
+- 트레이드오프: 초기 SSR 은 선택 미정(selected=null) 상태로 렌더, 선택은 하이드레이션 후 확정.
+  구조적 콘텐츠(헤더/선택기/제목)는 SSR 되어 SEO 확보.

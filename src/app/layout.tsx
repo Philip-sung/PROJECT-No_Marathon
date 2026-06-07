@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import { SiteHeader } from '@/components/site-header';
 
 // SEO/SNS 확산 기반(여론 조성 목적). Phase 3에서 OG 이미지·페이지별 메타 확장.
 export const metadata: Metadata = {
@@ -28,7 +29,13 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ko">
-      <body>{children}</body>
+      <body className="flex min-h-screen flex-col">
+        <SiteHeader />
+        <div className="flex-1">{children}</div>
+        <footer className="border-t border-gray-200 py-6 text-center text-xs text-gray-400">
+          no-marathon.kr · 시민 교통 불편 기록 프로젝트
+        </footer>
+      </body>
     </html>
   );
 }
