@@ -10,6 +10,7 @@ import type {
   CommentPublic,
   MarathonStats,
   Marathon,
+  EventInput,
 } from '@/lib/db/schema';
 import type { NormalizedMarathon } from '@/lib/agent/types';
 
@@ -98,6 +99,16 @@ interface CollectionLogRow {
   created_at: string;
 }
 const collectionLog: CollectionLogRow[] = [];
+
+// ── events(분석/자산화 헤지) ──────────────────────────────
+interface EventRow {
+  id: number;
+  event_type: string;
+  marathon_id: string | null;
+  created_at: string;
+}
+const events: EventRow[] = [];
+let eventSeq = 0;
 
 let counter = 0;
 function nextId(prefix: string): string {
@@ -294,6 +305,43 @@ export function getTodayCostUsd(todayPrefix: string): number {
   return collectionLog
     .filter((l) => l.created_at.startsWith(todayPrefix))
     .reduce((s, l) => s + (l.cost_usd ?? 0), 0);
+}
+
+export interface CollectionMetrics {
+  total_logged: number;
+  staged: number;
+  rejected: number;
+  failed: number;
+  skipped: number;
+  pending_review: number;
+  today_cost_usd: number;
+  event_count: number;
+}
+
+export function getCollectionMetrics(todayPrefix: string): CollectionMetrics {
+  const byStatus = (s: CollectionLogRow['status']) =>
+    collectionLog.filter((l) => l.status === s).length;
+  return {
+    total_logged: collectionLog.length,
+    staged: marathons.filter((m) => m.status === 'staging').length,
+    rejected: byStatus('failure'),
+    failed: byStatus('failure'),
+    skipped: byStatus('skipped'),
+    pending_review: byStatus('pending_review'),
+    today_cost_usd: getTodayCostUsd(todayPrefix),
+    event_count: events.length,
+  };
+}
+
+// ── events ────────────────────────────────────────────────
+export function addEvent(input: EventInput, nowIso: string): void {
+  eventSeq += 1;
+  events.push({
+    id: eventSeq,
+    event_type: input.event_type,
+    marathon_id: input.marathon_id ?? null,
+    created_at: nowIso,
+  });
 }
 
 export function upsertDisruption(

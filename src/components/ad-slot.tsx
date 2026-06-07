@@ -1,8 +1,44 @@
-// AdSense 자리(공익 컨셉 비침습). Phase 8/9 에서 실제 슬롯/스크립트로 교체.
+'use client';
+
+import { useEffect, useRef } from 'react';
+import { env } from '@/lib/env';
+
+/**
+ * 광고 슬롯. NEXT_PUBLIC_ADSENSE_CLIENT 미설정 시 placeholder(컨셉 보존, prompt §04),
+ * 설정 시 실제 AdSense 광고 렌더. 로더 스크립트는 layout 에서 조건부 주입.
+ */
 export function AdSlot({ label = '광고 영역' }: { label?: string }) {
+  const ref = useRef<HTMLModElement | null>(null);
+  const client = env.NEXT_PUBLIC_ADSENSE_CLIENT;
+
+  useEffect(() => {
+    if (!client) {
+      return;
+    }
+    try {
+      window.adsbygoogle = window.adsbygoogle ?? [];
+      window.adsbygoogle.push({});
+    } catch {
+      // 광고 로드 실패는 무시.
+    }
+  }, [client]);
+
+  if (!client) {
+    return (
+      <div className="my-8 flex h-24 items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 text-xs text-gray-300">
+        {label} (AdSense placeholder)
+      </div>
+    );
+  }
+
   return (
-    <div className="my-8 flex h-24 items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 text-xs text-gray-300">
-      {label} (AdSense placeholder)
-    </div>
+    <ins
+      ref={ref}
+      className="adsbygoogle my-8 block"
+      style={{ display: 'block' }}
+      data-ad-client={client}
+      data-ad-format="auto"
+      data-full-width-responsive="true"
+    />
   );
 }

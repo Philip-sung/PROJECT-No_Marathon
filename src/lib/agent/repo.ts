@@ -158,6 +158,57 @@ export async function listStaging(): Promise<StagingMarathon[]> {
   return StagingSchema.array().parse(data);
 }
 
+export interface CollectionMetrics {
+  total_logged: number;
+  staged: number;
+  pending_review: number;
+  today_cost_usd: number;
+  event_count: number;
+}
+
+export async function collectionMetrics(
+  todayPrefix: string,
+): Promise<CollectionMetrics> {
+  if (isMock) {
+    const m = store.getCollectionMetrics(todayPrefix);
+    return {
+      total_logged: m.total_logged,
+      staged: m.staged,
+      pending_review: m.pending_review,
+      today_cost_usd: Number(m.today_cost_usd.toFixed(6)),
+      event_count: m.event_count,
+    };
+  }
+  const supabase = createAdminSupabase();
+  if (!supabase) {
+    return {
+      total_logged: 0,
+      staged: 0,
+      pending_review: 0,
+      today_cost_usd: 0,
+      event_count: 0,
+    };
+  }
+  const [logCount, staging, todayCost, eventCount] = await Promise.all([
+    supabase
+      .from('ai_collection_log')
+      .select('*', { count: 'exact', head: true }),
+    supabase
+      .from('marathons')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'staging'),
+    todayCostUsd(todayPrefix),
+    supabase.from('events').select('*', { count: 'exact', head: true }),
+  ]);
+  return {
+    total_logged: logCount.count ?? 0,
+    staged: staging.count ?? 0,
+    pending_review: staging.count ?? 0,
+    today_cost_usd: Number(todayCost.toFixed(6)),
+    event_count: eventCount.count ?? 0,
+  };
+}
+
 export async function reviewMarathon(
   id: string,
   action: 'publish' | 'reject',

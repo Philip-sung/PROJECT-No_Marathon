@@ -2,8 +2,18 @@ import { NextResponse } from 'next/server';
 import { DisruptionInputSchema } from '@/lib/db/schema';
 import { writeDisruption } from '@/lib/data/mutations';
 import { deviceHashFromRequest } from '@/lib/identity/device';
+import { rateLimitOr429 } from '@/lib/security/guard';
+import { RATE_LIMITS } from '@/lib/security/rate-limit';
 
 export async function POST(request: Request) {
+  const limited = rateLimitOr429(
+    request,
+    'disruptions',
+    RATE_LIMITS.disruptions,
+  );
+  if (limited) {
+    return limited;
+  }
   const body: unknown = await request.json().catch(() => null);
   const parsed = DisruptionInputSchema.safeParse(body);
   if (!parsed.success) {

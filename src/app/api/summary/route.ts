@@ -16,5 +16,10 @@ export async function GET(request: Request) {
     );
   }
   const summary = await getMarathonSummary(parsed.data);
-  return NextResponse.json(summary);
+  // 트래픽 스파이크 대응: 짧은 edge/CDN 캐시 + stale-while-revalidate.
+  return NextResponse.json(summary, {
+    headers: {
+      'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30',
+    },
+  });
 }

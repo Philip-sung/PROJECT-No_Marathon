@@ -13,6 +13,8 @@ const serverEnvSchema = z.object({
   DEVICE_HASH_SALT: z.string().optional().or(z.literal('')),
   // 수집 에이전트 트리거(cron/webhook) 인증 토큰.
   AGENT_TRIGGER_SECRET: z.string().optional().or(z.literal('')),
+  // 알림/escalation 용 Slack incoming webhook(선택).
+  SLACK_WEBHOOK_URL: z.string().optional().or(z.literal('')),
 });
 
 const parsed = serverEnvSchema.safeParse({
@@ -21,6 +23,7 @@ const parsed = serverEnvSchema.safeParse({
   REPORT_INBOX_EMAIL: process.env.REPORT_INBOX_EMAIL,
   DEVICE_HASH_SALT: process.env.DEVICE_HASH_SALT,
   AGENT_TRIGGER_SECRET: process.env.AGENT_TRIGGER_SECRET,
+  SLACK_WEBHOOK_URL: process.env.SLACK_WEBHOOK_URL,
 });
 
 if (!parsed.success) {

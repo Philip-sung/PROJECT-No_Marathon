@@ -6,6 +6,7 @@ import type {
   DisruptionInput,
   CommentInput,
   ReportInput,
+  EventInput,
 } from '@/lib/db/schema';
 
 /**
@@ -110,5 +111,27 @@ export async function writeReport(
   if (error) {
     throw new Error(`신고 접수 실패: ${error.message}`);
   }
-  // TODO(Phase 8/9): REPORT_INBOX_EMAIL 로 알림 발송.
+}
+
+export async function writeEvent(
+  input: EventInput,
+  deviceHash: string,
+): Promise<void> {
+  if (isMock) {
+    store.addEvent(input, nowIso());
+    return;
+  }
+  const supabase = createAdminSupabase();
+  if (!supabase) {
+    return;
+  }
+  const { error } = await supabase.from('events').insert({
+    event_type: input.event_type,
+    marathon_id: input.marathon_id ?? null,
+    device_hash: deviceHash,
+    props: input.props ?? {},
+  });
+  if (error) {
+    throw new Error(`이벤트 기록 실패: ${error.message}`);
+  }
 }

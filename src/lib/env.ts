@@ -8,6 +8,8 @@ const publicEnvSchema = z.object({
   NEXT_PUBLIC_APP_MODE: z.enum(['mock', 'live']).default('mock'),
   NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional().or(z.literal('')),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().optional().or(z.literal('')),
+  // AdSense 게시자 ID(ca-pub-...). 설정 시 실제 광고, 미설정 시 placeholder.
+  NEXT_PUBLIC_ADSENSE_CLIENT: z.string().optional().or(z.literal('')),
 });
 
 // Next.js는 NEXT_PUBLIC_* 를 빌드 타임에 인라인하므로 직접 참조해야 한다.
@@ -15,6 +17,7 @@ const parsed = publicEnvSchema.safeParse({
   NEXT_PUBLIC_APP_MODE: process.env.NEXT_PUBLIC_APP_MODE,
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  NEXT_PUBLIC_ADSENSE_CLIENT: process.env.NEXT_PUBLIC_ADSENSE_CLIENT,
 });
 
 if (!parsed.success) {

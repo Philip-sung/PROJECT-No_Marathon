@@ -6,6 +6,8 @@ import { researchMarathon } from '@/lib/agent/worker';
 import { judgeQuality } from '@/lib/agent/judge';
 import { contentHash } from '@/lib/agent/hash';
 import * as repo from '@/lib/agent/repo';
+import { notify } from '@/lib/observability/notify';
+import { logger } from '@/lib/observability/logger';
 import type { CollectionRunResult, TargetResult } from '@/lib/agent/types';
 
 /**
@@ -163,10 +165,13 @@ export async function runCollection(): Promise<CollectionRunResult> {
       failures / results.length > AGENT_CONFIG.maxFailureRate
     ) {
       escalated = true;
-      // external escalation: 실제 알림은 Phase 8(메일/Slack). 지금은 로그.
-      console.error(
-        `[AGENT ESCALATION] run=${runId} 실패율 초과(${failures}/${results.length}) — 수집 중단`,
-      );
+      // external escalation(PDF §11.3): 알림 + 중단.
+      await notify({
+        level: 'error',
+        title: '수집 에이전트 circuit breaker',
+        detail: `run=${runId} 실패율 초과(${failures}/${results.length}) — 수집 중단`,
+        fields: { run_id: runId },
+      });
       break;
     }
   }
@@ -174,7 +179,7 @@ export async function runCollection(): Promise<CollectionRunResult> {
   const tally = (outcome: TargetResult['outcome']) =>
     results.filter((r) => r.outcome === outcome).length;
 
-  return {
+  const summary: CollectionRunResult = {
     run_id: runId,
     targets: targets.length,
     staged: tally('staged'),
@@ -185,4 +190,14 @@ export async function runCollection(): Promise<CollectionRunResult> {
     escalated,
     results,
   };
+  logger.info('collection_run', {
+    run_id: summary.run_id,
+    staged: summary.staged,
+    skipped: summary.skipped,
+    rejected: summary.rejected,
+    failed: summary.failed,
+    cost_usd: summary.total_cost_usd,
+    escalated: summary.escalated,
+  });
+  return summary;
 }

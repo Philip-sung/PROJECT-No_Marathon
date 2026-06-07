@@ -41,6 +41,14 @@
   (v_*_public)로만 anon 노출. 뷰는 owner 권한 실행(security_invoker off)으로 RLS 우회+컬럼필터.
 - 근거: 익명 식별 해시를 외부에 노출하지 않기 위함(프라이버시/어뷰즈 방지).
 
+## ADR-011 · 관측성·가드레일·트래픽 — 2026-06-07
+- 관측성: 구조적 JSON 로거, /api/health, /api/agent/metrics(ledger 파생), notify(Slack webhook+로그)=external escalation.
+- 어뷰즈 방어: 인메모리 고정윈도우 rate limit(기기 기준, 쓰기 라우트, 초과 429). 다중 인스턴스 시 Redis 로 교체.
+- 트래픽 스파이크: /api/summary 에 s-maxage=10 + stale-while-revalidate=30(edge/CDN 캐시).
+- 자산화 헤지: events 테이블 + /api/events + page_view 비콘(Analytics). AdSense 는 NEXT_PUBLIC_ADSENSE_CLIENT
+  설정 시 실광고, 미설정 시 placeholder(컨셉 보존).
+- 검증: 429(rate limit), 캐시 헤더, health, metrics, event_count 스모크.
+
 ## ADR-010 · 수집 에이전트: 4-Layer + dry-run 검수 — 2026-06-07
 - 결정: PDF TR-2026-04 의 4-Layer 를 수집 에이전트에 적용.
   L1=트리거 라우트(/api/agent/collect, x-agent-secret) · L2=ai_collection_log ledger + content_hash dedup
