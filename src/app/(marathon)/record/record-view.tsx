@@ -5,30 +5,40 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useMarathon } from '@/lib/marathon/context';
 import { fetchSummary } from '@/lib/api/client';
 import type { Summary } from '@/lib/api/types';
-import { formatDurationKo, formatNumber } from '@/lib/format';
+import { formatDurationKo, formatNumber, formatRelativeKo } from '@/lib/format';
 import { CountUp } from '@/components/ui/count-up';
 import { DisruptionForm } from '@/components/record/disruption-form';
 import { CommentSection } from '@/components/record/comment-section';
 import { ReportForm } from '@/components/record/report-form';
 import { AdSlot } from '@/components/ad-slot';
 
+const PAGE = 10;
+const POLL_MS = 7000;
+
 export function RecordView() {
   const { selected } = useMarathon();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(false);
+  const [visible, setVisible] = useState(PAGE);
 
-  const load = useCallback(async (id: string) => {
-    setLoading(true);
+  const load = useCallback(async (id: string, silent = false) => {
+    if (!silent) {
+      setLoading(true);
+    }
     try {
       setSummary(await fetchSummary(id));
     } catch {
-      // 조회 실패 시 빈 상태 유지.
+      // 조회 실패 시 기존 상태 유지.
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, []);
 
+  // 마라톤 변경 시 초기 로드 + 페이지 리셋.
   useEffect(() => {
+    setVisible(PAGE);
     if (selected?.id) {
       void load(selected.id);
     } else {
@@ -36,9 +46,24 @@ export function RecordView() {
     }
   }, [selected?.id, load]);
 
+  // 주기 폴링(짧게) — 새 기록/댓글 자동 반영. 탭이 숨겨지면 건너뜀.
+  useEffect(() => {
+    if (!selected?.id) {
+      return;
+    }
+    const id = selected.id;
+    const timer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) {
+        return;
+      }
+      void load(id, true);
+    }, POLL_MS);
+    return () => clearInterval(timer);
+  }, [selected?.id, load]);
+
   const refresh = useCallback(() => {
     if (selected?.id) {
-      void load(selected.id);
+      void load(selected.id, true);
     }
   }, [selected?.id, load]);
 
@@ -49,6 +74,7 @@ export function RecordView() {
   const stats = summary?.stats ?? null;
   const disruptions = summary?.disruptions ?? [];
   const comments = summary?.comments ?? [];
+  const shown = disruptions.slice(0, visible);
 
   return (
     <div className="space-y-12">
@@ -83,44 +109,57 @@ export function RecordView() {
       {/* 입력 */}
       <DisruptionForm marathonId={selected.id} onDone={refresh} />
 
-      {/* 불편자 리스트 */}
+      {/* 불편자 리스트 (최신순) */}
       <section>
-        <h2 className="text-lg font-bold">불편을 겪은 사람들</h2>
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-lg font-bold">불편을 겪은 사람들</h2>
+          <span className="text-xs text-muted">최신순</span>
+        </div>
         <ul className="mt-4 space-y-2">
-          {disruptions.length === 0 ? (
+          {shown.length === 0 ? (
             <li className="glass rounded-2xl py-8 text-center text-sm text-muted">
               아직 기록이 없습니다. 첫 기록을 남겨주세요.
             </li>
           ) : (
-            <AnimatePresence initial={false}>
-              {disruptions.map((d, i) => (
+            <AnimatePresence initial={false} mode="popLayout">
+              {shown.map((d) => (
                 <motion.li
                   key={d.id}
                   layout
-                  initial={{ opacity: 0, x: -12 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: Math.min(i * 0.03, 0.3) }}
-                  className="glass flex items-center justify-between rounded-2xl px-5 py-3.5"
+                  initial={{ opacity: 0, y: -10, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.97 }}
+                  transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+                  className="glass rounded-2xl px-5 py-3.5"
                 >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="flex h-7 w-7 flex-none items-center justify-center rounded-lg bg-white/5 text-xs font-bold text-muted">
-                      {i + 1}
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-medium">{d.display_name ?? '익명'}</p>
+                    <span className="flex-none font-bold text-accent2">
+                      {formatDurationKo(d.minutes_lost)}
                     </span>
-                    <div className="min-w-0">
-                      <p className="font-medium">{d.display_name ?? '익명'}</p>
-                      {d.note ? (
-                        <p className="truncate text-sm text-muted">{d.note}</p>
-                      ) : null}
-                    </div>
                   </div>
-                  <span className="ml-3 flex-none font-bold text-accent2">
-                    {formatDurationKo(d.minutes_lost)}
-                  </span>
+                  <p className="mt-0.5 text-xs text-muted">
+                    {[selected.area, d.region, formatRelativeKo(d.created_at)]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                  {d.note ? (
+                    <p className="mt-1 text-sm text-muted/90">{d.note}</p>
+                  ) : null}
                 </motion.li>
               ))}
             </AnimatePresence>
           )}
         </ul>
+        {disruptions.length > visible ? (
+          <button
+            type="button"
+            onClick={() => setVisible((v) => v + PAGE)}
+            className="mt-3 w-full rounded-full border border-line py-2.5 text-sm text-muted transition hover:border-accent/40 hover:text-fg"
+          >
+            더보기 ({disruptions.length - visible}개 더)
+          </button>
+        ) : null}
       </section>
 
       <AdSlot />

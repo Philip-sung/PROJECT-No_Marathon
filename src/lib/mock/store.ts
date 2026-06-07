@@ -67,6 +67,7 @@ function toPublicDisruption(r: DisruptionRow): DisruptionPublic {
     minutes_lost: r.minutes_lost,
     note: r.note,
     display_name: r.display_name,
+    region: r.region,
     created_at: r.created_at,
   };
 }
@@ -81,9 +82,10 @@ function toPublicComment(r: CommentRow): CommentPublic {
 }
 
 export function listDisruptions(marathonId: string): DisruptionPublic[] {
+  // 최신순(created_at desc).
   return disruptions
     .filter((d) => d.marathon_id === marathonId)
-    .sort((a, b) => b.minutes_lost - a.minutes_lost)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .map(toPublicDisruption);
 }
 
@@ -294,6 +296,7 @@ export function upsertDisruption(
     minutes_lost: number;
     note?: string | null;
     display_name?: string | null;
+    region?: string | null;
   },
   deviceHash: string,
   nowIso: string,
@@ -305,6 +308,7 @@ export function upsertDisruption(
     existing.minutes_lost = input.minutes_lost;
     existing.note = input.note ?? null;
     existing.display_name = input.display_name ?? null;
+    existing.region = input.region ?? null;
     existing.created_at = nowIso;
     return;
   }
@@ -314,6 +318,7 @@ export function upsertDisruption(
     minutes_lost: input.minutes_lost,
     note: input.note ?? null,
     display_name: input.display_name ?? null,
+    region: input.region ?? null,
     created_at: nowIso,
     device_hash: deviceHash,
   });

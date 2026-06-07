@@ -35,7 +35,7 @@ export async function getMarathonSummary(marathonId: string): Promise<Summary> {
       .from('v_disruptions_public')
       .select('*')
       .eq('marathon_id', marathonId)
-      .order('minutes_lost', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(DISRUPTION_LIST_LIMIT),
     supabase
       .from('v_comments_public')

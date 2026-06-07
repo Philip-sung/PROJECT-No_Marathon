@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { submitDisruption } from '@/lib/api/client';
 import { LIMITS } from '@/lib/db/constants';
+import { getHeuristicRegion } from '@/lib/geo';
 import { useToast } from '@/components/ui/toast';
 
 const inputCls =
@@ -46,11 +47,13 @@ export function DisruptionForm({
     }
     setBusy(true);
     try {
+      const region = await getHeuristicRegion(); // 위치 권한 허용 시에만(비침습)
       await submitDisruption({
         marathon_id: marathonId,
         minutes_lost: m,
         note: note.trim() || null,
         display_name: displayName.trim() || null,
+        region,
       });
       setMinutes('');
       setNote('');

@@ -37,6 +37,7 @@ export async function writeDisruption(
       minutes_lost: input.minutes_lost,
       note: input.note ?? null,
       display_name: input.display_name ?? null,
+      region: input.region ?? null,
     },
     { onConflict: 'marathon_id,device_hash' },
   );

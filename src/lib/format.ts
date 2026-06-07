@@ -18,3 +18,34 @@ export function formatDurationKo(minutes: number): string {
 export function formatNumber(n: number): string {
   return n.toLocaleString('ko-KR');
 }
+
+/** ISO 시각을 상대시간으로. 예: "방금 전", "5분 전", "3시간 전", "2일 전", 그 이상은 날짜. */
+export function formatRelativeKo(
+  iso: string,
+  now: number = Date.now(),
+): string {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) {
+    return '';
+  }
+  const diffSec = Math.floor((now - t) / 1000);
+  if (diffSec < 30) {
+    return '방금 전';
+  }
+  if (diffSec < 60) {
+    return `${diffSec}초 전`;
+  }
+  const min = Math.floor(diffSec / 60);
+  if (min < 60) {
+    return `${min}분 전`;
+  }
+  const hr = Math.floor(min / 60);
+  if (hr < 24) {
+    return `${hr}시간 전`;
+  }
+  const day = Math.floor(hr / 24);
+  if (day < 7) {
+    return `${day}일 전`;
+  }
+  return iso.slice(0, 10);
+}

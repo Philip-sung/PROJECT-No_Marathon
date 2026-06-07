@@ -32,6 +32,7 @@ export const DisruptionPublicSchema = z.object({
   minutes_lost: z.number().int(),
   note: z.string().nullable(),
   display_name: z.string().nullable(),
+  region: z.string().nullable().default(null),
   created_at: z.string(),
 });
 export type DisruptionPublic = z.infer<typeof DisruptionPublicSchema>;
@@ -65,6 +66,7 @@ export const DisruptionInputSchema = z.object({
     .max(LIMITS.disruptionMaxMinutes),
   note: z.string().max(LIMITS.noteMax).optional().nullable(),
   display_name: z.string().max(LIMITS.displayNameMax).optional().nullable(),
+  region: z.string().max(40).optional().nullable(),
 });
 export type DisruptionInput = z.infer<typeof DisruptionInputSchema>;
 

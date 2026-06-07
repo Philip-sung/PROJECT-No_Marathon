@@ -37,6 +37,7 @@ export interface DisruptionRow {
   minutes_lost: number;
   note: string | null;
   display_name: string | null;
+  region: string | null;
   created_at: string;
 }
 export interface CommentRow {
@@ -113,6 +114,7 @@ function baseDisruptions(): DisruptionRow[] {
       minutes_lost: 120,
       note: '택시도 못 잡음',
       display_name: '광화문주민',
+      region: '도심',
       created_at: '2026-04-19T10:00:00+09:00',
     },
     {
@@ -122,6 +124,7 @@ function baseDisruptions(): DisruptionRow[] {
       minutes_lost: 90,
       note: '버스가 30분째 안 옴',
       display_name: '종로직장인',
+      region: '도심',
       created_at: '2026-04-19T09:30:00+09:00',
     },
     {
@@ -131,6 +134,7 @@ function baseDisruptions(): DisruptionRow[] {
       minutes_lost: 45,
       note: '병원 예약 놓칠 뻔',
       display_name: null,
+      region: null,
       created_at: '2026-04-19T09:00:00+09:00',
     },
     {
@@ -140,6 +144,7 @@ function baseDisruptions(): DisruptionRow[] {
       minutes_lost: 30,
       note: null,
       display_name: null,
+      region: '여의도',
       created_at: '2026-10-11T09:00:00+09:00',
     },
   ];
@@ -209,6 +214,7 @@ function heavyDisruptions(count: number): DisruptionRow[] {
     '회기동학생',
     null,
   ];
+  const regions = ['도심', '강남', '강북', '서부', '동부', null];
   const rows: DisruptionRow[] = [];
   for (let i = 0; i < count; i += 1) {
     const hh = String(6 + (i % 12)).padStart(2, '0');
@@ -225,6 +231,7 @@ function heavyDisruptions(count: number): DisruptionRow[] {
             ? '길이 다 막혀 한참 걸림'
             : null,
       display_name: names[i % names.length] ?? null,
+      region: regions[i % regions.length] ?? null,
       created_at: `2026-05-03T${hh}:${mm}:00+09:00`,
     });
   }
