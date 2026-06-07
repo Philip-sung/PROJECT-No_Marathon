@@ -2,12 +2,12 @@
 
 > 매 Phase 갱신. 신뢰 출처(context rot 방어). last-checked 기준 최신 상태만 유지하고 과거는 ARCHIVE.md로 compaction.
 
-last-checked: 2026-06-07 (Phase 5 완료)
+last-checked: 2026-06-07 (Phase 6 완료)
 
 ## Current
-- Phase: **Phase 5 완료, Phase 6 대기**
-- 다음 액션: 사용자 `다음` → Phase 6(페이지 ③ 우회 대응) 시작
-- 미결/이월: 실시간(Supabase realtime)·신고 메일발송은 Phase 8/9. /record 는 선택이 클라이언트라 summary 클라 fetch(SEO 영향 경미).
+- Phase: **Phase 6 완료, Phase 7 대기**
+- 다음 액션: 사용자 `다음` → Phase 7(자율 데이터 수집 에이전트, PDF 4-Layer 핵심) 시작
+- 미결/이월: 실시간(Supabase realtime)·신고 메일발송은 Phase 8/9. /record·/detour 선택은 클라이언트.
 - 방향 확정: dual-track (ADR-003). 쓰기=서버경유(ADR-007), 공개읽기=뷰(ADR-008), 선택 URL동기화(ADR-009).
 - 미결: 취지 페이지(Phase 4) "여론 기반 대책" 데이터 모델 — 정적/별도필드 여부 Phase 4에서 결정.
 - 주의: SQL 은 실DB 미적용(로컬 psql/supabase CLI 없음). Supabase 프로젝트 연결 시 적용.
@@ -30,9 +30,11 @@ last-checked: 2026-06-07 (Phase 5 완료)
 - [x] Phase 5 — 메인(분노해소): 합계 헤드라인, 불편자 리스트, 입력폼(과도입력 필터+idempotent),
       주최정보, 무기명 댓글(top5+최신)+좋아요, 앱신고(메일 secret), AdSlot. 서버 Route Handler 쓰기.
       mock 인메모리 스토어. 채점 9.5/10. 검증: E2E 스모크(입력→집계, 400, idempotency, 댓글/좋아요/신고)
+- [x] Phase 6 — 우회 안내: 위치 권한 단계적(선택)+거리 점증 안내, detour_info(Zod 파싱) 지하철/버스,
+      권한거부 graceful, 외부 지도(네이버/카카오) 링크. 채점 9/10. 검증: 게이트+200 스모크
 
-## Queue (Phase 6 → 9)
-- [ ] Phase 6 — 페이지 ③ 우회 대응
+## Queue (Phase 7 → 9)
+- [ ] Phase 7 — 자율 데이터 수집 에이전트 (4-Layer)
 - [ ] Phase 3 — 공유 레이아웃 & 마라톤 선택 컨텍스트
 - [ ] Phase 4 — 페이지 ① 취지
 - [ ] Phase 5 — 페이지 ② 분노 해소 집계 (메인)
