@@ -2,14 +2,14 @@
 
 > 매 Phase 갱신. 신뢰 출처(context rot 방어). last-checked 기준 최신 상태만 유지하고 과거는 ARCHIVE.md로 compaction.
 
-last-checked: 2026-06-07 (Phase 8 완료)
+last-checked: 2026-06-07 (Phase 9 완료 — 전체 구현 완료)
 
 ## Current
-- Phase: **Phase 8 완료, Phase 9 대기 (마지막)**
-- 다음 액션: 사용자 `다음` → Phase 9(배포 & 턴키 인계) 시작
-- 미결/이월(Phase 9 또는 live): 실시간(Supabase realtime) 미구현(현재 fetch 갱신).
-  rate limit/스토어는 인메모리(단일 인스턴스). live 경로(Supabase/Anthropic)는 키 연결 시 실검증.
-  신고/escalation 메일은 SLACK_WEBHOOK_URL 또는 메일 연동 시 활성(현재 로그).
+- Phase: **✅ 전체 완료 (Phase 0~9)**. dev(mock) 기준 기능 완결 + standalone 프로덕션 런타임 검증.
+- 다음 액션(사용자): docs/90_deploy-and-handover.md 따라 Supabase 연결 + secret 주입 + Vultr 배포.
+- live 잔여(인프라 필요): Supabase 마이그레이션 적용, NEXT_PUBLIC_* build-arg live 빌드,
+  도메인/HTTPS, cron 등록, live 경로(Supabase/Anthropic) 1회 E2E 재검증.
+- 알려진 한계: 실시간=fetch 갱신, rate limit/ledger 인메모리(단일 인스턴스), 메일은 webhook/log.
 - 방향 확정: dual-track (ADR-003). 쓰기=서버경유(ADR-007), 공개읽기=뷰(ADR-008), 선택 URL동기화(ADR-009).
 - 미결: 취지 페이지(Phase 4) "여론 기반 대책" 데이터 모델 — 정적/별도필드 여부 Phase 4에서 결정.
 - 주의: SQL 은 실DB 미적용(로컬 psql/supabase CLI 없음). Supabase 프로젝트 연결 시 적용.
@@ -39,9 +39,11 @@ last-checked: 2026-06-07 (Phase 8 완료)
       mock 결정론/ live Anthropic fetch. 채점 9/10. 검증: E2E(staged2/rejected1/dedup skipped2/publish→published)
 - [x] Phase 8 — 관측성(로거/health/metrics/notify-escalation), rate limit(429), summary 캐싱,
       events+page_view 비콘, AdSense 게이팅. 채점 9/10. 검증: health/429/캐시헤더/metrics 스모크
+- [x] Phase 9 — 배포(Dockerfile standalone+compose, build/runtime env 분리), SEO(robots/sitemap),
+      종합 인계 문서(docs/90), 운영 런북. 채점 9/10. 검증: standalone prod 서버 기동(health 200/3페이지/agent)
 
-## Queue (Phase 9)
-- [ ] Phase 9 — 배포 & 턴키 인계
+## Queue
+- (없음 — 전체 완료)
 - [ ] Phase 3 — 공유 레이아웃 & 마라톤 선택 컨텍스트
 - [ ] Phase 4 — 페이지 ① 취지
 - [ ] Phase 5 — 페이지 ② 분노 해소 집계 (메인)
