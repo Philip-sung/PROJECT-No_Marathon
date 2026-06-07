@@ -15,9 +15,16 @@ export const AGENT_CONFIG = {
   // 품질 게이트(LLM-as-judge)
   qualityThreshold: 7.0,
 
-  // 모델 tier 분리(PDF §7.2.2): worker=저비용, judge=중간.
-  workerModel: 'claude-haiku-4-5-20251001',
+  // worker 는 web_search(서버 도구)를 쓰므로 이를 지원하는 Sonnet 사용.
+  // judge 는 검색 불필요 → Sonnet 으로 채점.
+  workerModel: 'claude-sonnet-4-6',
   judgeModel: 'claude-sonnet-4-6',
+} as const;
+
+/** 서버사이드 웹 검색 도구(실제 정보 수집용). */
+export const WEB_SEARCH_TOOL = {
+  type: 'web_search_20260209',
+  name: 'web_search',
 } as const;
 
 /** 모델별 100만 토큰당 단가(USD). 비용 추정용(대략치). */

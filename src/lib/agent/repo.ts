@@ -4,6 +4,11 @@ import { isMock } from '@/lib/env';
 import { createAdminSupabase } from '@/lib/supabase/admin';
 import * as store from '@/lib/mock/store';
 import type { NormalizedMarathon } from '@/lib/agent/types';
+import {
+  AdminMarathonSchema,
+  type AdminMarathon,
+  type AdminMarathonPatch,
+} from '@/lib/db/schema';
 
 /**
  * 수집 에이전트 영속 계층(L2). mock→인메모리 스토어, live→service_role.
@@ -210,6 +215,47 @@ export async function collectionMetrics(
     today_cost_usd: Number(todayCost.toFixed(6)),
     event_count: eventCount.count ?? 0,
   };
+}
+
+// ── 관리자(백오피스) ──────────────────────────────────────
+export async function listAllMarathons(): Promise<AdminMarathon[]> {
+  if (isMock) {
+    return store.listAllMarathons();
+  }
+  const supabase = createAdminSupabase();
+  if (!supabase) {
+    return [];
+  }
+  const { data, error } = await supabase
+    .from('marathons')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) {
+    throw new Error(`마라톤 전체 조회 실패: ${error.message}`);
+  }
+  return AdminMarathonSchema.array().parse(data);
+}
+
+export async function updateMarathon(
+  id: string,
+  patch: AdminMarathonPatch,
+): Promise<boolean> {
+  if (isMock) {
+    return store.updateMarathon(id, patch);
+  }
+  const supabase = createAdminSupabase();
+  if (!supabase) {
+    return false;
+  }
+  const { data, error } = await supabase
+    .from('marathons')
+    .update(patch)
+    .eq('id', id)
+    .select('id');
+  if (error) {
+    throw new Error(`마라톤 수정 실패: ${error.message}`);
+  }
+  return Array.isArray(data) && data.length > 0;
 }
 
 export async function reviewMarathon(

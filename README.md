@@ -47,7 +47,11 @@ npm run dev                  # http://localhost:3000
 | 검수 대기 목록 | `GET /api/agent/staging` |
 | 승격/반려 | `POST /api/agent/review` `{ "id", "action": "publish"|"reject" }` |
 
-cron 예시(30분 주기): `*` 5칸 cron 표현식 뒤에
-`curl -XPOST -H "x-agent-secret: $AGENT_TRIGGER_SECRET" https://no-marathon.kr/api/agent/collect`
+live 에서는 worker 가 **web_search(Sonnet)** 로 실제 웹을 검색해 정형화한다. cron 은 **하루 1회 권장**:
+`0 4 * * *` 뒤에 `curl -XPOST -H "x-agent-secret: $AGENT_TRIGGER_SECRET" https://no-marathon.kr/api/agent/collect`
 
-가드레일: per-call max_tokens · per-session 예산 · per-day 쿼터 · 실패율 circuit breaker · LLM-as-judge 품질 임계 · content_hash 중복 회피. 에이전트는 staging 까지만(자동 게시 금지).
+가드레일: per-call max_tokens · per-session 예산 · per-day 쿼터 · 실패율 circuit breaker · LLM-as-judge 품질 임계 · content_hash 중복 회피 · 검색 미확인 값 null. 에이전트는 staging 까지만(자동 게시 금지).
+
+## 간이 백오피스 (정보 관리)
+
+`/admin` 접속 → **관리자 번호(ADMIN_PASSCODE)** 입력 → 전체 마라톤(staging/published/archived)을 확인하고 필드·우회정보(JSON)·통제구간(JSON)을 직접 수정, 게시/보관 처리. (mock/dev 에서는 번호 미설정 시 아무 값이나 입력)

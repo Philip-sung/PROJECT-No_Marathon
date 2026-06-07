@@ -7,7 +7,8 @@ import type { Usage } from '@/lib/agent/types';
 /**
  * Claude 구조적 호출 래퍼. mock 모드면 결정론적 canned 값(외부호출 없음),
  * live 모드면 Anthropic Messages API 호출 후 JSON 을 Zod 로 검증.
- * tool description engineering 원칙: 호출부가 자족적 system/prompt 를 제공.
+ * tools 를 주면 서버사이드 도구(web_search 등)를 사용하며, 서버 루프가
+ * pause_turn 으로 멈추면 assistant 응답을 되돌려 보내 재개한다.
  */
 interface CallStructuredOpts<S extends z.ZodTypeAny> {
   model: string;
@@ -15,14 +16,22 @@ interface CallStructuredOpts<S extends z.ZodTypeAny> {
   prompt: string;
   schema: S;
   maxTokens: number;
+  /** 서버사이드 도구(예: web_search). live 에서만 사용. */
+  tools?: unknown[];
   /** mock 모드에서 반환할 결정론적 값 생성기. */
   mock: () => z.infer<S>;
 }
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
+const MAX_CONTINUATIONS = 4;
 
+// content 블록은 type/text 외 필드(server_tool_use 등)를 보존해야 재전송 가능.
+const BlockSchema = z
+  .object({ type: z.string(), text: z.string().optional() })
+  .passthrough();
 const MessagesResponseSchema = z.object({
-  content: z.array(z.object({ type: z.string(), text: z.string().optional() })),
+  stop_reason: z.string().nullable().optional(),
+  content: z.array(BlockSchema),
   usage: z.object({
     input_tokens: z.number(),
     output_tokens: z.number(),
@@ -54,38 +63,49 @@ export async function callStructured<S extends z.ZodTypeAny>(
     throw new Error('live 모드 수집에는 ANTHROPIC_API_KEY 가 필요합니다.');
   }
 
-  const res = await fetch(ANTHROPIC_URL, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': serverEnv.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: opts.model,
-      max_tokens: opts.maxTokens,
-      system: `${opts.system}\n\n반드시 유효한 JSON 객체 하나만 출력하세요. 설명/문장 금지.`,
-      messages: [{ role: 'user', content: opts.prompt }],
-    }),
-  });
+  const messages: { role: 'user' | 'assistant'; content: unknown }[] = [
+    { role: 'user', content: opts.prompt },
+  ];
+  const usage: Usage = { input_tokens: 0, output_tokens: 0 };
+  let finalText = '';
 
-  if (!res.ok) {
-    throw new Error(`Anthropic API 오류: ${res.status}`);
+  for (let i = 0; i < MAX_CONTINUATIONS; i += 1) {
+    const res = await fetch(ANTHROPIC_URL, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': serverEnv.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: opts.model,
+        max_tokens: opts.maxTokens,
+        system: `${opts.system}\n\n작업이 끝나면 반드시 유효한 JSON 객체 하나만 출력하세요. 그 외 설명/문장 금지.`,
+        messages,
+        ...(opts.tools ? { tools: opts.tools } : {}),
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Anthropic API 오류: ${res.status}`);
+    }
+
+    const json: unknown = await res.json();
+    const envelope = MessagesResponseSchema.parse(json);
+    usage.input_tokens += envelope.usage.input_tokens;
+    usage.output_tokens += envelope.usage.output_tokens;
+    finalText = envelope.content
+      .map((c) => c.text ?? '')
+      .join('')
+      .trim();
+
+    // 서버 도구 루프가 멈춤 → assistant 응답을 되돌려 보내 재개.
+    if (envelope.stop_reason === 'pause_turn') {
+      messages.push({ role: 'assistant', content: envelope.content });
+      continue;
+    }
+    break;
   }
 
-  const json: unknown = await res.json();
-  const envelope = MessagesResponseSchema.parse(json);
-  const text = envelope.content
-    .map((c) => c.text ?? '')
-    .join('')
-    .trim();
-
-  const data = opts.schema.parse(extractJson(text));
-  return {
-    data,
-    usage: {
-      input_tokens: envelope.usage.input_tokens,
-      output_tokens: envelope.usage.output_tokens,
-    },
-  };
+  return { data: opts.schema.parse(extractJson(finalText)), usage };
 }

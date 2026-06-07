@@ -15,6 +15,8 @@ const serverEnvSchema = z.object({
   AGENT_TRIGGER_SECRET: z.string().optional().or(z.literal('')),
   // 알림/escalation 용 Slack incoming webhook(선택).
   SLACK_WEBHOOK_URL: z.string().optional().or(z.literal('')),
+  // 간이 백오피스(/admin) 관리자 번호. 미설정 시 dev 에서만 무인증 허용.
+  ADMIN_PASSCODE: z.string().optional().or(z.literal('')),
 });
 
 const parsed = serverEnvSchema.safeParse({
@@ -24,6 +26,7 @@ const parsed = serverEnvSchema.safeParse({
   DEVICE_HASH_SALT: process.env.DEVICE_HASH_SALT,
   AGENT_TRIGGER_SECRET: process.env.AGENT_TRIGGER_SECRET,
   SLACK_WEBHOOK_URL: process.env.SLACK_WEBHOOK_URL,
+  ADMIN_PASSCODE: process.env.ADMIN_PASSCODE,
 });
 
 if (!parsed.success) {

@@ -49,6 +49,47 @@ export const CommentPublicSchema = z.object({
 });
 export type CommentPublic = z.infer<typeof CommentPublicSchema>;
 
+// ── 관리자(백오피스)용: 전체 필드 + 상태 ──────────────────
+export const AdminMarathonSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  event_date: z.string(),
+  start_time: z.string().nullable(),
+  end_time: z.string().nullable(),
+  area: z.string(),
+  lat: z.number().nullable(),
+  lng: z.number().nullable(),
+  organizer_name: z.string().nullable(),
+  organizer_url: z.string().nullable(),
+  organizer_contact: z.string().nullable(),
+  organizer_email: z.string().nullable(),
+  detour_info: z.record(z.string(), z.unknown()),
+  control_zone: z.record(z.string(), z.unknown()),
+  source: z.string().nullable(),
+  content_hash: z.string().nullable(),
+  status: z.enum(['staging', 'published', 'archived']),
+  created_at: z.string(),
+});
+export type AdminMarathon = z.infer<typeof AdminMarathonSchema>;
+
+export const AdminMarathonPatchSchema = z.object({
+  name: z.string().min(1).optional(),
+  event_date: z.string().optional(),
+  start_time: z.string().nullable().optional(),
+  end_time: z.string().nullable().optional(),
+  area: z.string().optional(),
+  lat: z.number().nullable().optional(),
+  lng: z.number().nullable().optional(),
+  organizer_name: z.string().nullable().optional(),
+  organizer_url: z.string().nullable().optional(),
+  organizer_contact: z.string().nullable().optional(),
+  organizer_email: z.string().nullable().optional(),
+  detour_info: z.record(z.string(), z.unknown()).optional(),
+  control_zone: z.record(z.string(), z.unknown()).optional(),
+  status: z.enum(['staging', 'published', 'archived']).optional(),
+});
+export type AdminMarathonPatch = z.infer<typeof AdminMarathonPatchSchema>;
+
 export const MarathonStatsSchema = z.object({
   marathon_id: z.string().uuid(),
   name: z.string(),

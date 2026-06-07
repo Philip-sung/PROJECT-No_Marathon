@@ -97,12 +97,16 @@ server {
 
 ## 6. 수집 에이전트 cron (L1 Heartbeat)
 
-마라톤 시즌에 주기 수집. crontab 에 등록(예: 30분 주기):
+live 에서는 worker 가 web_search(Sonnet)로 실제 정보를 검색·정형화. crontab 에 **하루 1회** 등록:
 ```
-*/30 * * * * curl -s -XPOST -H "x-agent-secret: $AGENT_TRIGGER_SECRET" https://no-marathon.kr/api/agent/collect >> /var/log/nm-agent.log 2>&1
+0 4 * * * curl -s -XPOST -H "x-agent-secret: $AGENT_TRIGGER_SECRET" https://no-marathon.kr/api/agent/collect >> /var/log/nm-agent.log 2>&1
 ```
-가드레일: per-call/세션/일일/이상 4단 비용 한도 + LLM-as-judge 품질 임계 + content_hash 중복 회피.
+가드레일: per-call/세션/일일/이상 4단 비용 한도 + LLM-as-judge 품질 임계 + content_hash 중복 회피 + 검색 미확인값 null.
 에이전트는 staging 까지만 — 게시는 사람 검수.
+
+### 6.1 간이 백오피스 (/admin)
+`https://no-marathon.kr/admin` → ADMIN_PASSCODE 입력 → 수집된 마라톤 확인·수정(필드/우회JSON/통제구간JSON)·게시/보관.
+prompt.md "개발자가 화면에서 보고 틀리면 직접 수정"을 이 화면으로 충족(또는 Supabase 직접 수정도 가능).
 
 ---
 

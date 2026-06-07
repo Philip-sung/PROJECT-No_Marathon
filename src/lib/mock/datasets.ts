@@ -361,7 +361,7 @@ export function getMockDataset(): MockDataset {
 
 // ── 수집 에이전트(worker) mock 결과 — 여기로 통합 ──────────
 export const MOCK_RESEARCH: Record<string, NormalizedMarathon> = {
-  'seoul-spring': {
+  'seoul-upcoming': {
     name: '서울 도심 봄 마라톤',
     event_date: '2026-04-26',
     area: '광화문·종로 일대',
@@ -380,7 +380,7 @@ export const MOCK_RESEARCH: Record<string, NormalizedMarathon> = {
     },
     source: 'mock://seoul-spring',
   },
-  'hangang-autumn': {
+  'hangang-upcoming': {
     name: '한강 가을 마라톤',
     event_date: '2026-10-18',
     area: '여의도·마포대교 일대',

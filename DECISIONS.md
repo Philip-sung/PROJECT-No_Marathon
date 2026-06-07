@@ -41,6 +41,14 @@
   (v_*_public)로만 anon 노출. 뷰는 owner 권한 실행(security_invoker off)으로 RLS 우회+컬럼필터.
 - 근거: 익명 식별 해시를 외부에 노출하지 않기 위함(프라이버시/어뷰즈 방지).
 
+## ADR-014 · 실제 수집(web_search) + 간이 백오피스(/admin) — 2026-06-07
+- 실제 수집: worker 가 Anthropic 서버 도구 web_search(`web_search_20260209`)로 웹을 검색해 정형화(live).
+  worker 모델 Sonnet 4.6(검색 지원). claude.ts 가 pause_turn 재개·usage 합산 처리. mock 은 canned 유지.
+- 거짓정보 방지: 검색으로 확인 안 된 값은 null, judge 품질 게이트(7) + dry-run staging + 사람 검수.
+- 간이 백오피스 /admin: 관리자 번호(ADMIN_PASSCODE) 입력 → 전체 마라톤 확인·필드/JSON 수정·게시/보관.
+  쓰기는 /api/admin/* (service_role/스토어). prompt.md "개발자가 보고 직접 수정" 충족.
+- cron: 하루 1회(예 04:00). collect maxDuration 300(검색 지연 대비).
+
 ## ADR-013 · 우회 지도 + 통제정보 + 우회로 공유 — 2026-06-07
 - 지도: Leaflet + OpenStreetMap(키 불필요, dev 즉시 동작). 동적 import(SSR 회피), circleMarker로 아이콘 에셋 회피.
 - 통제구간: marathons.control_zone(jsonb: center/radius_m/polygon), 통제시간: start_time/end_time → formatControlPeriod.

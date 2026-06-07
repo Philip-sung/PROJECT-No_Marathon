@@ -12,6 +12,8 @@ import type {
   MarathonStats,
   Marathon,
   EventInput,
+  AdminMarathon,
+  AdminMarathonPatch,
 } from '@/lib/db/schema';
 import type { NormalizedMarathon } from '@/lib/agent/types';
 
@@ -207,6 +209,61 @@ export function addStagingMarathon(
     created_at: nowIso,
   });
   return id;
+}
+
+// ── 관리자(백오피스) ──────────────────────────────────────
+function toAdminMarathon(r: MarathonRow): AdminMarathon {
+  return {
+    id: r.id,
+    name: r.name,
+    event_date: r.event_date,
+    start_time: r.start_time,
+    end_time: r.end_time,
+    area: r.area,
+    lat: r.lat,
+    lng: r.lng,
+    organizer_name: r.organizer_name,
+    organizer_url: r.organizer_url,
+    organizer_contact: r.organizer_contact,
+    organizer_email: r.organizer_email,
+    detour_info: r.detour_info,
+    control_zone: r.control_zone,
+    source: r.source,
+    content_hash: r.content_hash,
+    status: r.status,
+    created_at: r.created_at,
+  };
+}
+
+export function listAllMarathons(): AdminMarathon[] {
+  return [...marathons]
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .map(toAdminMarathon);
+}
+
+export function updateMarathon(id: string, patch: AdminMarathonPatch): boolean {
+  const m = marathons.find((x) => x.id === id);
+  if (!m) {
+    return false;
+  }
+  if (patch.name !== undefined) m.name = patch.name;
+  if (patch.event_date !== undefined) m.event_date = patch.event_date;
+  if (patch.start_time !== undefined) m.start_time = patch.start_time;
+  if (patch.end_time !== undefined) m.end_time = patch.end_time;
+  if (patch.area !== undefined) m.area = patch.area;
+  if (patch.lat !== undefined) m.lat = patch.lat;
+  if (patch.lng !== undefined) m.lng = patch.lng;
+  if (patch.organizer_name !== undefined)
+    m.organizer_name = patch.organizer_name;
+  if (patch.organizer_url !== undefined) m.organizer_url = patch.organizer_url;
+  if (patch.organizer_contact !== undefined)
+    m.organizer_contact = patch.organizer_contact;
+  if (patch.organizer_email !== undefined)
+    m.organizer_email = patch.organizer_email;
+  if (patch.detour_info !== undefined) m.detour_info = patch.detour_info;
+  if (patch.control_zone !== undefined) m.control_zone = patch.control_zone;
+  if (patch.status !== undefined) m.status = patch.status;
+  return true;
 }
 
 export function promoteMarathon(id: string): boolean {

@@ -12,8 +12,17 @@ export interface ResearchTarget {
 
 export function getResearchTargets(): ResearchTarget[] {
   return [
-    { key: 'seoul-spring', query: '서울 도심 봄 마라톤 교통통제 일정' },
-    { key: 'hangang-autumn', query: '한강 가을 마라톤 교통통제 일정' },
-    { key: 'incomplete-sample', query: '정보 불완전 샘플 마라톤' },
+    {
+      key: 'seoul-upcoming',
+      query: '다가오는 서울 도심 마라톤 일정과 도로 교통통제 구간·시간',
+    },
+    {
+      key: 'hangang-upcoming',
+      query: '여의도·한강 일대 마라톤 일정과 교통통제 우회 안내',
+    },
+    {
+      key: 'seoul-jamsil',
+      query: '잠실·강남 권역 마라톤 대회 일정 및 교통 통제 정보',
+    },
   ];
 }
