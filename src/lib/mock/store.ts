@@ -1,4 +1,5 @@
 import 'server-only';
+import { randomUUID } from 'node:crypto';
 import {
   MOCK_MARATHONS,
   MOCK_DISRUPTIONS,
@@ -8,7 +9,9 @@ import type {
   DisruptionPublic,
   CommentPublic,
   MarathonStats,
+  Marathon,
 } from '@/lib/db/schema';
+import type { NormalizedMarathon } from '@/lib/agent/types';
 
 /**
  * Mock 인메모리 스토어 — dev(mock 모드)에서 외부 DB 없이 입력/집계/댓글이
@@ -40,6 +43,61 @@ const comments: CommentRow[] = MOCK_COMMENTS.map((c, i) => ({
 }));
 const likes = new Set<string>(); // `${commentId}|${deviceHash}`
 const reports: ReportRow[] = [];
+
+// ── 마라톤(수집 에이전트 staging/publish, L2) ──────────────
+interface MarathonRow {
+  id: string;
+  name: string;
+  event_date: string;
+  start_time: string | null;
+  end_time: string | null;
+  area: string;
+  lat: number | null;
+  lng: number | null;
+  organizer_name: string | null;
+  organizer_url: string | null;
+  organizer_contact: string | null;
+  organizer_email: string | null;
+  detour_info: Record<string, unknown>;
+  source: string | null;
+  content_hash: string | null;
+  status: 'staging' | 'published' | 'archived';
+  created_at: string;
+}
+
+const marathons: MarathonRow[] = MOCK_MARATHONS.map((m, i) => ({
+  id: m.id,
+  name: m.name,
+  event_date: m.event_date,
+  start_time: m.start_time,
+  end_time: m.end_time,
+  area: m.area,
+  lat: m.lat,
+  lng: m.lng,
+  organizer_name: m.organizer_name,
+  organizer_url: m.organizer_url,
+  organizer_contact: m.organizer_contact,
+  organizer_email: m.organizer_email,
+  detour_info: m.detour_info,
+  source: 'seed',
+  content_hash: `seed-${i}`,
+  status: 'published',
+  created_at: m.created_at,
+}));
+
+// ── 수집 ledger(L2) ───────────────────────────────────────
+interface CollectionLogRow {
+  id: string;
+  run_id: string;
+  target: string;
+  content_hash: string | null;
+  status: 'success' | 'failure' | 'skipped' | 'pending_review';
+  quality_score: number | null;
+  model: string | null;
+  cost_usd: number | null;
+  created_at: string;
+}
+const collectionLog: CollectionLogRow[] = [];
 
 let counter = 0;
 function nextId(prefix: string): string {
@@ -81,7 +139,7 @@ export function listComments(marathonId: string): CommentPublic[] {
 }
 
 export function computeStats(marathonId: string): MarathonStats {
-  const m = MOCK_MARATHONS.find((x) => x.id === marathonId);
+  const m = marathons.find((x) => x.id === marathonId);
   const rows = disruptions.filter((d) => d.marathon_id === marathonId);
   const total = rows.reduce((s, r) => s + r.minutes_lost, 0);
   const count = rows.length;
@@ -96,7 +154,146 @@ export function computeStats(marathonId: string): MarathonStats {
 }
 
 export function computeAllStats(): MarathonStats[] {
-  return MOCK_MARATHONS.map((m) => computeStats(m.id));
+  return marathons
+    .filter((m) => m.status === 'published')
+    .map((m) => computeStats(m.id));
+}
+
+// ── 마라톤(수집/검수) ─────────────────────────────────────
+function toPublicMarathon(r: MarathonRow): Marathon {
+  return {
+    id: r.id,
+    name: r.name,
+    event_date: r.event_date,
+    start_time: r.start_time,
+    end_time: r.end_time,
+    area: r.area,
+    lat: r.lat,
+    lng: r.lng,
+    organizer_name: r.organizer_name,
+    organizer_url: r.organizer_url,
+    organizer_contact: r.organizer_contact,
+    organizer_email: r.organizer_email,
+    detour_info: r.detour_info,
+    created_at: r.created_at,
+  };
+}
+
+export function listPublishedMarathons(): Marathon[] {
+  return marathons
+    .filter((m) => m.status === 'published')
+    .sort((a, b) => b.event_date.localeCompare(a.event_date))
+    .map(toPublicMarathon);
+}
+
+export interface StagingMarathon {
+  id: string;
+  name: string;
+  event_date: string;
+  area: string;
+  source: string | null;
+  content_hash: string | null;
+  created_at: string;
+}
+
+export function listStagingMarathons(): StagingMarathon[] {
+  return marathons
+    .filter((m) => m.status === 'staging')
+    .map((m) => ({
+      id: m.id,
+      name: m.name,
+      event_date: m.event_date,
+      area: m.area,
+      source: m.source,
+      content_hash: m.content_hash,
+      created_at: m.created_at,
+    }));
+}
+
+export function getAllContentHashes(): Set<string> {
+  const set = new Set<string>();
+  for (const m of marathons) {
+    if (m.content_hash) {
+      set.add(m.content_hash);
+    }
+  }
+  return set;
+}
+
+export function addStagingMarathon(
+  n: NormalizedMarathon,
+  contentHash: string,
+  nowIso: string,
+): string {
+  const id = randomUUID();
+  marathons.push({
+    id,
+    name: n.name,
+    event_date: n.event_date,
+    start_time: null,
+    end_time: null,
+    area: n.area,
+    lat: n.lat ?? null,
+    lng: n.lng ?? null,
+    organizer_name: n.organizer_name ?? null,
+    organizer_url: n.organizer_url ?? null,
+    organizer_contact: n.organizer_contact ?? null,
+    organizer_email: n.organizer_email ?? null,
+    detour_info: n.detour_info,
+    source: n.source ?? 'ai',
+    content_hash: contentHash,
+    status: 'staging',
+    created_at: nowIso,
+  });
+  return id;
+}
+
+export function promoteMarathon(id: string): boolean {
+  const m = marathons.find((x) => x.id === id && x.status === 'staging');
+  if (!m) {
+    return false;
+  }
+  m.status = 'published';
+  return true;
+}
+
+export function rejectMarathon(id: string): boolean {
+  const m = marathons.find((x) => x.id === id && x.status === 'staging');
+  if (!m) {
+    return false;
+  }
+  m.status = 'archived';
+  return true;
+}
+
+// ── 수집 ledger ───────────────────────────────────────────
+export function addCollectionLog(entry: {
+  run_id: string;
+  target: string;
+  content_hash: string | null;
+  status: 'success' | 'failure' | 'skipped' | 'pending_review';
+  quality_score: number | null;
+  model: string | null;
+  cost_usd: number | null;
+  nowIso: string;
+}): void {
+  collectionLog.push({
+    id: nextId('log'),
+    run_id: entry.run_id,
+    target: entry.target,
+    content_hash: entry.content_hash,
+    status: entry.status,
+    quality_score: entry.quality_score,
+    model: entry.model,
+    cost_usd: entry.cost_usd,
+    created_at: entry.nowIso,
+  });
+}
+
+export function getTodayCostUsd(todayPrefix: string): number {
+  return collectionLog
+    .filter((l) => l.created_at.startsWith(todayPrefix))
+    .reduce((s, l) => s + (l.cost_usd ?? 0), 0);
 }
 
 export function upsertDisruption(

@@ -1,0 +1,185 @@
+import 'server-only';
+import { z } from 'zod';
+import { isMock } from '@/lib/env';
+import { createAdminSupabase } from '@/lib/supabase/admin';
+import * as store from '@/lib/mock/store';
+import type { NormalizedMarathon } from '@/lib/agent/types';
+
+/**
+ * 수집 에이전트 영속 계층(L2). mock→인메모리 스토어, live→service_role.
+ */
+
+export interface StagingMarathon {
+  id: string;
+  name: string;
+  event_date: string;
+  area: string;
+  source: string | null;
+  content_hash: string | null;
+  created_at: string;
+}
+
+const StagingSchema: z.ZodType<StagingMarathon> = z.object({
+  id: z.string(),
+  name: z.string(),
+  event_date: z.string(),
+  area: z.string(),
+  source: z.string().nullable(),
+  content_hash: z.string().nullable(),
+  created_at: z.string(),
+});
+
+export async function existingContentHashes(): Promise<Set<string>> {
+  if (isMock) {
+    return store.getAllContentHashes();
+  }
+  const supabase = createAdminSupabase();
+  if (!supabase) {
+    return new Set();
+  }
+  const { data, error } = await supabase
+    .from('marathons')
+    .select('content_hash')
+    .not('content_hash', 'is', null);
+  if (error) {
+    throw new Error(`해시 조회 실패: ${error.message}`);
+  }
+  const rows = z
+    .array(z.object({ content_hash: z.string().nullable() }))
+    .parse(data);
+  return new Set(rows.flatMap((r) => (r.content_hash ? [r.content_hash] : [])));
+}
+
+export async function todayCostUsd(todayPrefix: string): Promise<number> {
+  if (isMock) {
+    return store.getTodayCostUsd(todayPrefix);
+  }
+  const supabase = createAdminSupabase();
+  if (!supabase) {
+    return 0;
+  }
+  const { data, error } = await supabase
+    .from('ai_collection_log')
+    .select('cost_usd')
+    .gte('created_at', `${todayPrefix}T00:00:00Z`);
+  if (error) {
+    throw new Error(`일일 비용 조회 실패: ${error.message}`);
+  }
+  const rows = z
+    .array(z.object({ cost_usd: z.number().nullable() }))
+    .parse(data);
+  return rows.reduce((s, r) => s + (r.cost_usd ?? 0), 0);
+}
+
+export async function stageMarathon(
+  n: NormalizedMarathon,
+  contentHash: string,
+  nowIso: string,
+): Promise<string> {
+  if (isMock) {
+    return store.addStagingMarathon(n, contentHash, nowIso);
+  }
+  const supabase = createAdminSupabase();
+  if (!supabase) {
+    throw new Error('admin 클라이언트가 없습니다.');
+  }
+  const { data, error } = await supabase
+    .from('marathons')
+    .insert({
+      name: n.name,
+      event_date: n.event_date,
+      area: n.area,
+      lat: n.lat ?? null,
+      lng: n.lng ?? null,
+      organizer_name: n.organizer_name ?? null,
+      organizer_url: n.organizer_url ?? null,
+      organizer_contact: n.organizer_contact ?? null,
+      organizer_email: n.organizer_email ?? null,
+      detour_info: n.detour_info,
+      source: n.source ?? 'ai',
+      content_hash: contentHash,
+      status: 'staging',
+    })
+    .select('id')
+    .single();
+  if (error) {
+    throw new Error(`staging 등록 실패: ${error.message}`);
+  }
+  return z.object({ id: z.string() }).parse(data).id;
+}
+
+export async function logCollection(entry: {
+  run_id: string;
+  target: string;
+  content_hash: string | null;
+  status: 'success' | 'failure' | 'skipped' | 'pending_review';
+  quality_score: number | null;
+  model: string | null;
+  cost_usd: number | null;
+  nowIso: string;
+}): Promise<void> {
+  if (isMock) {
+    store.addCollectionLog(entry);
+    return;
+  }
+  const supabase = createAdminSupabase();
+  if (!supabase) {
+    return;
+  }
+  const { error } = await supabase.from('ai_collection_log').insert({
+    run_id: entry.run_id,
+    target: entry.target,
+    content_hash: entry.content_hash,
+    status: entry.status,
+    quality_score: entry.quality_score,
+    model: entry.model,
+    cost_usd: entry.cost_usd,
+  });
+  if (error) {
+    throw new Error(`ledger 기록 실패: ${error.message}`);
+  }
+}
+
+export async function listStaging(): Promise<StagingMarathon[]> {
+  if (isMock) {
+    return store.listStagingMarathons();
+  }
+  const supabase = createAdminSupabase();
+  if (!supabase) {
+    return [];
+  }
+  const { data, error } = await supabase
+    .from('marathons')
+    .select('id, name, event_date, area, source, content_hash, created_at')
+    .eq('status', 'staging');
+  if (error) {
+    throw new Error(`staging 목록 조회 실패: ${error.message}`);
+  }
+  return StagingSchema.array().parse(data);
+}
+
+export async function reviewMarathon(
+  id: string,
+  action: 'publish' | 'reject',
+): Promise<boolean> {
+  if (isMock) {
+    return action === 'publish'
+      ? store.promoteMarathon(id)
+      : store.rejectMarathon(id);
+  }
+  const supabase = createAdminSupabase();
+  if (!supabase) {
+    return false;
+  }
+  const status = action === 'publish' ? 'published' : 'archived';
+  const { data, error } = await supabase
+    .from('marathons')
+    .update({ status })
+    .eq('id', id)
+    .eq('status', 'staging')
+    .select('id');
+  if (error) {
+    throw new Error(`검수 처리 실패: ${error.message}`);
+  }
+  return Array.isArray(data) && data.length > 0;
+}

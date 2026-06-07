@@ -41,6 +41,15 @@
   (v_*_public)로만 anon 노출. 뷰는 owner 권한 실행(security_invoker off)으로 RLS 우회+컬럼필터.
 - 근거: 익명 식별 해시를 외부에 노출하지 않기 위함(프라이버시/어뷰즈 방지).
 
+## ADR-010 · 수집 에이전트: 4-Layer + dry-run 검수 — 2026-06-07
+- 결정: PDF TR-2026-04 의 4-Layer 를 수집 에이전트에 적용.
+  L1=트리거 라우트(/api/agent/collect, x-agent-secret) · L2=ai_collection_log ledger + content_hash dedup
+  · L3=Orchestrator(targets)-Worker(haiku)-Judge(sonnet) · L4=cost guardrail 4단 + LLM-as-judge 임계 + dry-run.
+- 에이전트는 staging 까지만 적재. published 승격은 사람 검수(/api/agent/review). 자동 published 금지.
+- model tier 분리(worker=haiku 저비용, judge=sonnet). 비용은 ledger 에 기록(per-day quota 근거).
+- dev=mock(결정론 canned, 외부호출 0) / live=Anthropic Messages API(fetch) + service_role.
+- 검증: mock E2E — staged 2 / rejected 1(judge<7) / 재실행 skipped 2(dedup) / publish→published 조회.
+
 ## ADR-009 · 마라톤 선택: URL ?m 동기화 시 useSearchParams 회피 — 2026-06-07
 - 결정: MarathonProvider 는 useSearchParams 대신 마운트 후 window.location 에서 ?m 을 읽고,
   변경 시 router.replace 로 URL 갱신. (marathon) 레이아웃의 Suspense 제거.
