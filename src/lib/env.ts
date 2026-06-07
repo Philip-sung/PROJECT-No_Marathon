@@ -6,7 +6,14 @@ import { z } from 'zod';
  */
 const publicEnvSchema = z.object({
   NEXT_PUBLIC_APP_MODE: z.enum(['mock', 'live']).default('mock'),
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional().or(z.literal('')),
+  // 끝의 슬래시를 제거한다 — 안 그러면 Supabase REST 경로가 `…co//rest/v1/…` 이중 슬래시가 돼
+  // "Invalid path specified in request URL" 로 실패한다(흔한 함정).
+  NEXT_PUBLIC_SUPABASE_URL: z
+    .string()
+    .url()
+    .transform((s) => s.replace(/\/+$/, ''))
+    .optional()
+    .or(z.literal('')),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().optional().or(z.literal('')),
   // AdSense 게시자 ID(ca-pub-...). 설정 시 실제 광고, 미설정 시 placeholder.
   NEXT_PUBLIC_ADSENSE_CLIENT: z.string().optional().or(z.literal('')),

@@ -248,6 +248,13 @@ DNS 전파 확인 후 재시도. (80/443 은 기존 도메인들이 쓰고 있�
 Ingress 에 `nginx.ingress.kubernetes.io/rewrite-target: /` 를 넣으면 `/api/*`·`/admin` 등 모든 경로가
 `/` 로 재작성된다. Carrsh/Obtopus(SPA)는 써도 되지만 No-Marathon(SSR)은 **넣지 않는다**.
 
+**⑧ 홈이 500, 로그에 `집계 조회 실패: Invalid path specified in request URL`**
+`NEXT_PUBLIC_SUPABASE_URL` 끝에 슬래시가 붙어(`https://xxx.supabase.co/`) Supabase REST 경로가 이중
+슬래시(`…co//rest/v1/…`)가 된 것. GitHub Secret 값에서 trailing slash 제거 후 **재빌드**.
+(코드에서도 `env.ts` 가 trailing slash 를 정규화하도록 방어 처리됨 — 커밋 후 재빌드 시 적용.)
+참고: 로그가 `live 모드에는 … 가 필요합니다` 면 빌드 때 Supabase Secret 자체가 비었던 것(GitHub Secrets 설정 후 재빌드).
+`relation "v_marathon_stats" does not exist` 면 마이그레이션 미적용(루트 README 2번).
+
 ---
 
 ## 레포 public 전환 시 주의
