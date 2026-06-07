@@ -112,6 +112,12 @@ npm run dev                  # http://localhost:3000
 - `NEXT_PUBLIC_APP_MODE=mock` (기본): 외부 의존(Supabase/Claude) 없이 동작. 개발·검수용.
 - `NEXT_PUBLIC_APP_MODE=live`: 실제 Supabase/Claude 연동. secret 주입 필요.
 
+### 모킹 데이터셋 (`MOCK_DATASET`, mock 모드 전용)
+- `default` 기본 샘플 · `heavy` 대규모(480건/80댓글) · `empty` 빈 상태
+- `file` — **`mock-data/` 폴더의 JSON**(`marathons.json`/`disruptions.json`/`comments.json`)을 읽어
+  DB 로드와 **동일한 경로(store)** 로 주입. 누락 필드는 자동 기본값. 폴더는 `MOCK_DATA_DIR` 로 변경 가능.
+  예) `MOCK_DATASET=file npm run dev` → 폴더 내용이 화면/`/admin`에 그대로 반영.
+
 ## 수집 에이전트 (PDF 4-Layer)
 
 마라톤/주최/우회 정보를 Claude API 로 수집·정형화하여 staging 에 적재하고, 개발자 검수 후 published 로 승격한다.

@@ -1,56 +1,67 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { z } from 'zod';
 import type { NormalizedMarathon } from '@/lib/agent/types';
 
 /**
  * ── 모든 모킹/시드 데이터의 단일 출처(SSOT) ──
- * 흩어져 있던 fixtures/store-heavy/agent-mock 을 여기로 통합.
- * 주입은 환경변수 MOCK_DATASET 으로: 'default'(기본) | 'heavy'(대규모) | 'empty'(빈 상태).
- *   예) .env.local 에 MOCK_DATASET=heavy
- * store 는 getMockDataset() 으로 시드를 받아 메모리에 적재한다.
+ * 주입은 환경변수 MOCK_DATASET 으로:
+ *   'default'(기본) | 'heavy'(대규모) | 'empty'(빈 상태) | 'file'(폴더 JSON 로드).
+ *   예) .env.local 에 MOCK_DATASET=file  (+ MOCK_DATA_DIR=mock-data 기본)
+ * store 는 getMockDataset() 으로 시드를 받아 메모리에 적재한다 — DB 로드와 동일 경로.
+ *
+ * 행(row) 스키마: 파일 로드 시 검증·기본값 채움(누락 필드 허용). device_hash 포함(내부 저장 형태).
  */
+const json = z.record(z.string(), z.unknown());
 
-// ── 행(row) 타입: device_hash 포함(내부 저장 형태) ──────────
-export interface MarathonRow {
-  id: string;
-  name: string;
-  event_date: string;
-  start_time: string | null;
-  end_time: string | null;
-  area: string;
-  lat: number | null;
-  lng: number | null;
-  organizer_name: string | null;
-  organizer_url: string | null;
-  organizer_contact: string | null;
-  organizer_email: string | null;
-  detour_info: Record<string, unknown>;
-  control_zone: Record<string, unknown>;
-  source: string | null;
-  content_hash: string | null;
-  status: 'staging' | 'published' | 'archived';
-  created_at: string;
-}
-export interface DisruptionRow {
-  id: string;
-  marathon_id: string;
-  device_hash: string;
-  minutes_lost: number;
-  note: string | null;
-  display_name: string | null;
-  region: string | null;
-  created_at: string;
-}
-export interface CommentRow {
-  id: string;
-  marathon_id: string;
-  device_hash: string;
-  body: string;
-  like_count: number;
-  channel: 'voice' | 'detour';
-  region: string | null;
-  created_at: string;
-}
+export const MarathonRowSchema = z.object({
+  id: z.string().default(() => randomUUID()),
+  name: z.string(),
+  event_date: z.string(),
+  start_time: z.string().nullable().default(null),
+  end_time: z.string().nullable().default(null),
+  area: z.string().default(''),
+  lat: z.number().nullable().default(null),
+  lng: z.number().nullable().default(null),
+  organizer_name: z.string().nullable().default(null),
+  organizer_url: z.string().nullable().default(null),
+  organizer_contact: z.string().nullable().default(null),
+  organizer_email: z.string().nullable().default(null),
+  detour_info: json.default({}),
+  control_zone: json.default({}),
+  source: z.string().nullable().default('file'),
+  content_hash: z.string().nullable().default(null),
+  status: z.enum(['staging', 'published', 'archived']).default('published'),
+  created_at: z.string().default('2026-01-01T00:00:00+09:00'),
+});
+export type MarathonRow = z.infer<typeof MarathonRowSchema>;
+
+export const DisruptionRowSchema = z.object({
+  id: z.string().default(() => randomUUID()),
+  marathon_id: z.string(),
+  device_hash: z.string().default('file-seed'),
+  minutes_lost: z.number().int(),
+  note: z.string().nullable().default(null),
+  display_name: z.string().nullable().default(null),
+  region: z.string().nullable().default(null),
+  created_at: z.string().default('2026-01-01T00:00:00+09:00'),
+});
+export type DisruptionRow = z.infer<typeof DisruptionRowSchema>;
+
+export const CommentRowSchema = z.object({
+  id: z.string().default(() => randomUUID()),
+  marathon_id: z.string(),
+  device_hash: z.string().default('file-seed'),
+  body: z.string(),
+  like_count: z.number().int().default(0),
+  channel: z.enum(['voice', 'detour']).default('voice'),
+  region: z.string().nullable().default(null),
+  created_at: z.string().default('2026-01-01T00:00:00+09:00'),
+});
+export type CommentRow = z.infer<typeof CommentRowSchema>;
+
 export interface MockDataset {
   marathons: MarathonRow[];
   disruptions: DisruptionRow[];
@@ -329,12 +340,36 @@ function heavyComments(count: number): CommentRow[] {
   return rows;
 }
 
+// ── 파일(폴더) 로더 — DB 로드와 동일하게 store 시드로 들어감 ──
+// MOCK_DATA_DIR(기본 'mock-data') 의 marathons.json / disruptions.json /
+// comments.json 을 읽어 Zod 로 검증(누락 필드는 스키마 기본값으로 채움).
+function loadJsonArray<S extends z.ZodTypeAny>(
+  dir: string,
+  file: string,
+  schema: S,
+): z.infer<S>[] {
+  const path = join(process.cwd(), dir, file);
+  if (!existsSync(path)) {
+    return [];
+  }
+  const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'));
+  return schema.array().parse(parsed);
+}
+
+function loadFromDir(dir: string): MockDataset {
+  return {
+    marathons: loadJsonArray(dir, 'marathons.json', MarathonRowSchema),
+    disruptions: loadJsonArray(dir, 'disruptions.json', DisruptionRowSchema),
+    comments: loadJsonArray(dir, 'comments.json', CommentRowSchema),
+  };
+}
+
 // ── 데이터셋 선택(환경변수 주입) ───────────────────────────
-export type MockDatasetName = 'default' | 'heavy' | 'empty';
+export type MockDatasetName = 'default' | 'heavy' | 'empty' | 'file';
 
 export function getMockDatasetName(): MockDatasetName {
   const raw = (process.env.MOCK_DATASET ?? 'default').toLowerCase();
-  if (raw === 'heavy' || raw === 'empty') {
+  if (raw === 'heavy' || raw === 'empty' || raw === 'file') {
     return raw;
   }
   return 'default';
@@ -342,6 +377,9 @@ export function getMockDatasetName(): MockDatasetName {
 
 export function getMockDataset(): MockDataset {
   const name = getMockDatasetName();
+  if (name === 'file') {
+    return loadFromDir(process.env.MOCK_DATA_DIR ?? 'mock-data');
+  }
   if (name === 'empty') {
     return { marathons: baseMarathons(), disruptions: [], comments: [] };
   }
