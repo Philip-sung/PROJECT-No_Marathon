@@ -10,7 +10,10 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "kube-apply": "kubectl apply -f k8s/deployment.yaml && kubectl apply -f k8s/service.yaml",
+    "kube-rollout": "kubectl rollout restart deployment/no-marathon-deployment && kubectl rollout status deployment/no-marathon-deployment",
+    "kube-deploy:all": "npm run kube-apply && npm run kube-rollout"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

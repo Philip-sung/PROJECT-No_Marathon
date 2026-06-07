@@ -99,11 +99,13 @@ kubectl create secret docker-registry ghcr-cred-philip-sung \
 
 ```bash
 git push                                   # main 푸시 = GHCR 이미지 자동 빌드 시작
-# GitHub Actions 탭에서 빌드 초록불 확인 후:
-kubectl apply -f k8s/deployment.yaml
-kubectl apply -f k8s/service.yaml
-kubectl rollout status deployment/no-marathon-deployment
+# GitHub Actions 탭에서 빌드 초록불 확인 후, VM(kubectl 접근되는 노드)에서:
+npm run kube-deploy:all                    # = apply deployment+service → rollout restart → status
 ```
+
+`kube-deploy:all` 이 하는 일(개별 실행도 가능):
+- `npm run kube-apply` — `k8s/deployment.yaml` + `service.yaml` 적용
+- `npm run kube-rollout` — `rollout restart`(최신 `:latest` 이미지 재pull) + `rollout status`
 
 서비스는 ClusterIP(`no-marathon-service`, port 80 → 컨테이너 3000)다.
 
