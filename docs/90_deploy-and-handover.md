@@ -102,7 +102,7 @@ live 에서는 worker 가 web_search(Sonnet)로 실제 정보를 검색·정형�
 0 4 * * * curl -s -XPOST -H "x-agent-secret: $AGENT_TRIGGER_SECRET" https://no-marathon.kr/api/agent/collect >> /var/log/nm-agent.log 2>&1
 ```
 가드레일: per-call/세션/일일/이상 4단 비용 한도 + LLM-as-judge 품질 임계 + content_hash 중복 회피 + 검색 미확인값 null.
-에이전트는 staging 까지만 — 게시는 사람 검수.
+품질 게이트 통과분은 **즉시 게시**(AGENT_CONFIG.autoPublish=true). 틀린 정보는 /admin 에서 사후 수정·보관(false 로 두면 수동 검수).
 
 ### 6.1 간이 백오피스 (/admin)
 `https://no-marathon.kr/admin` → ADMIN_PASSCODE 입력 → 수집된 마라톤 확인·수정(필드/우회JSON/통제구간JSON)·게시/보관.

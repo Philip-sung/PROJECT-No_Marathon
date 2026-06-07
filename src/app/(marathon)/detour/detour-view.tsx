@@ -121,7 +121,7 @@ export function DetourView() {
                 polygon={zone.polygon}
               />
               <p className="mt-1.5 text-xs text-muted/70">
-                붉은 영역이 대략적인 통제 구간입니다(근사).
+                붉은 선이 대략적인 통제 경로입니다(근사).
               </p>
             </motion.div>
           ) : (

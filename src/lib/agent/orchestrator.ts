@@ -1,11 +1,13 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
+import { isMock } from '@/lib/env';
 import { AGENT_CONFIG, estimateCostUsd } from '@/lib/agent/config';
 import { getResearchTargets } from '@/lib/agent/targets';
 import { researchMarathon } from '@/lib/agent/worker';
 import { judgeQuality } from '@/lib/agent/judge';
 import { contentHash } from '@/lib/agent/hash';
 import * as repo from '@/lib/agent/repo';
+import { sendCollectionReport, type StagedSummary } from '@/lib/agent/mail';
 import { notify } from '@/lib/observability/notify';
 import { logger } from '@/lib/observability/logger';
 import type { CollectionRunResult, TargetResult } from '@/lib/agent/types';
@@ -27,7 +29,10 @@ export async function runCollection(): Promise<CollectionRunResult> {
   const todayCostStart = await repo.todayCostUsd(todayPrefix);
 
   const results: TargetResult[] = [];
+  const stagedDetails: StagedSummary[] = [];
   let sessionCost = 0;
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
   let failures = 0;
   let escalated = false;
 
@@ -57,6 +62,8 @@ export async function runCollection(): Promise<CollectionRunResult> {
 
     try {
       const research = await researchMarathon(target);
+      totalInputTokens += research.usage.input_tokens;
+      totalOutputTokens += research.usage.output_tokens;
       let cost = estimateCostUsd(
         AGENT_CONFIG.workerModel,
         research.usage.input_tokens,
@@ -89,6 +96,8 @@ export async function runCollection(): Promise<CollectionRunResult> {
 
       // LLM-as-judge 품질 게이트
       const judged = await judgeQuality(research.data);
+      totalInputTokens += judged.usage.input_tokens;
+      totalOutputTokens += judged.usage.output_tokens;
       cost += estimateCostUsd(
         AGENT_CONFIG.judgeModel,
         judged.usage.input_tokens,
@@ -117,14 +126,24 @@ export async function runCollection(): Promise<CollectionRunResult> {
         continue;
       }
 
-      // dry-run: staging 등록(검수 대기)
-      await repo.stageMarathon(research.data, hash, nowIso);
+      // 적재 후, autoPublish 면 즉시 게시(품질 게이트 통과분만). 아니면 staging 유지.
+      const newId = await repo.stageMarathon(research.data, hash, nowIso);
       existing.add(hash);
+      if (AGENT_CONFIG.autoPublish) {
+        await repo.reviewMarathon(newId, 'publish');
+      }
+      stagedDetails.push({
+        name: research.data.name,
+        event_date: research.data.event_date,
+        area: research.data.area,
+        source: research.data.source ?? null,
+        quality_score: judged.data.score,
+      });
       await repo.logCollection({
         run_id: runId,
         target: target.query,
         content_hash: hash,
-        status: 'pending_review',
+        status: AGENT_CONFIG.autoPublish ? 'success' : 'pending_review',
         quality_score: judged.data.score,
         model: AGENT_CONFIG.judgeModel,
         cost_usd: cost,
@@ -187,6 +206,8 @@ export async function runCollection(): Promise<CollectionRunResult> {
     rejected: tally('rejected_quality'),
     failed: tally('failed'),
     total_cost_usd: Number(sessionCost.toFixed(6)),
+    total_input_tokens: totalInputTokens,
+    total_output_tokens: totalOutputTokens,
     escalated,
     results,
   };
@@ -197,7 +218,20 @@ export async function runCollection(): Promise<CollectionRunResult> {
     rejected: summary.rejected,
     failed: summary.failed,
     cost_usd: summary.total_cost_usd,
+    input_tokens: summary.total_input_tokens,
+    output_tokens: summary.total_output_tokens,
     escalated: summary.escalated,
   });
+
+  // 수집 완료 리포트 메일(수동/cron 무관). best-effort — 메일 실패가 수집을 막지 않음.
+  await sendCollectionReport({
+    result: summary,
+    staged: stagedDetails,
+    startedAtIso: nowIso,
+    finishedAtIso: new Date().toISOString(),
+    mode: isMock ? 'mock' : 'live',
+    autoPublished: AGENT_CONFIG.autoPublish,
+  });
+
   return summary;
 }

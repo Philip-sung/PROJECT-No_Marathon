@@ -62,7 +62,14 @@ export function CommentSection({
     };
   }, [requireLocation]);
 
-  const scoped = comments.filter((c) => c.channel === channel);
+  // 우회로(detour) 공유는 같은 권역끼리만 노출한다. 뷰어의 권역을 알 때(위치 공유)
+  // 그 권역 댓글로 한정 — 예: 강남 사용자는 강남 우회정보만 본다.
+  // 위치 미공유로 권역을 모르면 우선 전체를 보여주고, 공유하면 내 권역으로 좁힌다.
+  const regionScoped =
+    requireLocation && region
+      ? comments.filter((c) => c.region === region)
+      : comments;
+  const scoped = regionScoped.filter((c) => c.channel === channel);
   const ordered = orderCommentsForDisplay(scoped, { pageSize: 1000 });
   const shown = ordered.slice(0, visible);
   const canWrite = !requireLocation || Boolean(region);

@@ -14,6 +14,9 @@ export const AGENT_CONFIG = {
   maxFailureRate: 0.5, // run 내 실패율이 이 값을 넘으면 중단+escalate
   // 품질 게이트(LLM-as-judge)
   qualityThreshold: 7.0,
+  // 수집 즉시 자동 게시(true) — 사람 검수(staging) 생략. 품질 게이트는 그대로 유지.
+  // false 면 staging 까지만 적재하고 /admin 에서 수동 게시(ADR-007 원안).
+  autoPublish: true,
 
   // worker 는 web_search(서버 도구)를 쓰므로 이를 지원하는 Sonnet 사용.
   // judge 는 검색 불필요 → Sonnet 으로 채점.

@@ -17,6 +17,12 @@ const serverEnvSchema = z.object({
   SLACK_WEBHOOK_URL: z.string().optional().or(z.literal('')),
   // 간이 백오피스(/admin) 관리자 번호. 미설정 시 dev 에서만 무인증 허용.
   ADMIN_PASSCODE: z.string().optional().or(z.literal('')),
+  // ── 수집 리포트 메일(네이버 SMTP) ──
+  // send-naver-mail 스킬과 동일한 자격증명. 미설정 시 메일 발송은 조용히 생략.
+  NAVER_MAIL_USER: z.string().optional().or(z.literal('')),
+  NAVER_MAIL_APP_PASSWORD: z.string().optional().or(z.literal('')),
+  // 수집 리포트 수신 주소. 미설정 시 NAVER_MAIL_USER 로 자기 자신에게 발송.
+  COLLECTION_REPORT_EMAIL: z.string().email().optional().or(z.literal('')),
 });
 
 const parsed = serverEnvSchema.safeParse({
@@ -27,6 +33,9 @@ const parsed = serverEnvSchema.safeParse({
   AGENT_TRIGGER_SECRET: process.env.AGENT_TRIGGER_SECRET,
   SLACK_WEBHOOK_URL: process.env.SLACK_WEBHOOK_URL,
   ADMIN_PASSCODE: process.env.ADMIN_PASSCODE,
+  NAVER_MAIL_USER: process.env.NAVER_MAIL_USER,
+  NAVER_MAIL_APP_PASSWORD: process.env.NAVER_MAIL_APP_PASSWORD,
+  COLLECTION_REPORT_EMAIL: process.env.COLLECTION_REPORT_EMAIL,
 });
 
 if (!parsed.success) {

@@ -73,6 +73,8 @@ export interface CollectionRunResult {
   rejected: number;
   failed: number;
   total_cost_usd: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
   escalated: boolean;
   results: TargetResult[];
 }

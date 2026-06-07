@@ -1,37 +1,96 @@
 [
   {
-    "id": "11111111-1111-1111-1111-111111111111",
-    "name": "(파일) 서울 봄 마라톤",
-    "event_date": "2026-04-19",
-    "start_time": "2026-04-19T07:00:00+09:00",
-    "end_time": "2026-04-19T13:00:00+09:00",
-    "area": "광화문·종로 일대",
-    "lat": 37.5759,
-    "lng": 126.9769,
-    "organizer_name": "○○마라톤조직위",
-    "organizer_url": "https://example.org",
-    "organizer_email": "organizer@example.org",
+    "id": "c1234560-0607-4260-8abc-def000000001",
+    "name": "2026 iM뱅크 코리아 오픈 마라톤",
+    "event_date": "2026-06-07",
+    "start_time": "2026-06-07T07:30:00+09:00",
+    "end_time": "2026-06-07T13:00:00+09:00",
+    "area": "여의도공원·한강변 일대",
+    "lat": 37.527,
+    "lng": 126.9336,
+    "organizer_name": "iM뱅크",
+    "organizer_url": "https://imrun.kr/marathon/code/8046/",
+    "organizer_email": null,
     "detour_info": {
-      "subway": ["1호선 종각역 이용"],
-      "bus": ["간선 03번 우회"]
+      "subway": ["5호선 여의도역 이용", "9호선 국회의사당역 이용"],
+      "bus": ["여의도 경유 버스 전 노선 임시 우회 운행"],
+      "note": "여의도공원 및 한강변 코스 통제. 대회 종료 전 차량 진입 불가."
     },
     "control_zone": {
-      "center": { "lat": 37.5759, "lng": 126.9769 },
-      "radius_m": 1500
+      "center": { "lat": 37.527, "lng": 126.9336 },
+      "radius_m": 1500,
+      "polygon": [
+        [37.5283, 126.9252],
+        [37.527, 126.9336],
+        [37.5246, 126.9402],
+        [37.5232, 126.9335],
+        [37.5258, 126.9262]
+      ]
     },
-    "status": "published"
+    "source": "https://news.seoul.go.kr/culture/archives/533156",
+    "status": "published",
+    "created_at": "2026-06-07T04:00:00+09:00"
   },
   {
-    "id": "22222222-2222-2222-2222-222222222222",
-    "name": "(파일) 한강 가을 마라톤",
-    "event_date": "2026-10-11",
-    "area": "여의도·마포대교 일대",
-    "lat": 37.5285,
-    "lng": 126.9325,
-    "control_zone": {
-      "center": { "lat": 37.5285, "lng": 126.9325 },
-      "radius_m": 1200
+    "id": "c1234560-0830-4260-8abc-def000000002",
+    "name": "제3회 한강 서울 하프 마라톤",
+    "event_date": "2026-08-30",
+    "start_time": "2026-08-30T08:00:00+09:00",
+    "end_time": "2026-08-30T13:00:00+09:00",
+    "area": "여의도 한강공원·물빛광장",
+    "lat": 37.5283,
+    "lng": 126.9336,
+    "organizer_name": "서울스포츠(주)",
+    "organizer_url": "https://seoulhalfrun.kr/",
+    "organizer_email": null,
+    "detour_info": {
+      "subway": ["5호선 여의도역", "9호선 국회의사당역"],
+      "bus": ["여의도 한강공원 경유 버스 임시 우회 운행"],
+      "note": "여의도 한강공원 물빛광장 일대 통제. 5km·10km·하프 코스 운영."
     },
-    "status": "published"
+    "control_zone": {
+      "center": { "lat": 37.5283, "lng": 126.9336 },
+      "radius_m": 1200,
+      "polygon": [
+        [37.529, 126.93],
+        [37.5283, 126.9336],
+        [37.5272, 126.942],
+        [37.526, 126.95]
+      ]
+    },
+    "source": "https://seoulhalfrun.kr/",
+    "status": "published",
+    "created_at": "2026-06-07T04:00:00+09:00"
+  },
+  {
+    "id": "c1234560-1101-4260-8abc-def000000003",
+    "name": "2026 JTBC 서울마라톤",
+    "event_date": "2026-11-01",
+    "start_time": "2026-11-01T08:00:00+09:00",
+    "end_time": "2026-11-01T15:00:00+09:00",
+    "area": "상암월드컵경기장→여의도→광화문→잠실",
+    "lat": 37.5683,
+    "lng": 126.898,
+    "organizer_name": "JTBC",
+    "organizer_url": "http://marathon.jtbc.com/",
+    "organizer_email": null,
+    "detour_info": {
+      "subway": ["6호선 월드컵경기장역", "5호선 여의도역", "2호선 잠실역"],
+      "bus": ["상암·여의도·광화문·잠실 구간 경유 버스 전 노선 임시 우회"],
+      "note": "서울 관통 42.195km 풀코스. 코스 전 구간 오전 5시부터 순차 통제."
+    },
+    "control_zone": {
+      "center": { "lat": 37.527, "lng": 126.9336 },
+      "radius_m": 3000,
+      "polygon": [
+        [37.5683, 126.898],
+        [37.527, 126.9336],
+        [37.5759, 126.9769],
+        [37.5152, 127.0731]
+      ]
+    },
+    "source": "http://marathon.jtbc.com/",
+    "status": "published",
+    "created_at": "2026-06-07T04:00:00+09:00"
   }
 ]

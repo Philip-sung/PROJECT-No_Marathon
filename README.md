@@ -8,7 +8,7 @@
 
 > 한 번만 세팅하면, 그 뒤로는 **하루 1회 자동 수집 → `/admin`에서 검토·게시**만 하면 됩니다.
 > ⚠️ 중요: **앱 배포만으로는 수집이 안 됩니다. 6번 cron 등록까지 해야 자동으로 돕니다.**
-> 그리고 수집은 staging까지만 — 사용자에게 보이려면 **`/admin`에서 "게시"를 눌러야** 합니다(틀린 정보 방지용 안전장치).
+> 수집분은 **품질 게이트(LLM-as-judge)를 통과하면 즉시 게시**됩니다(autoPublish). 틀린 정보는 `/admin`에서 수정·보관하세요.
 
 ### 0. 준비물 (계정·키)
 - [ ] Supabase 프로젝트
@@ -37,6 +37,10 @@ AGENT_TRIGGER_SECRET=내가_정한_긴_문자열
 ADMIN_PASSCODE=내가_정한_관리자_번호
 DEVICE_HASH_SALT=아무거나_긴_문자열
 REPORT_INBOX_EMAIL=내메일@example.com        # 앱 불편신고 수신(선택)
+# 수집 리포트 메일(선택) — send-naver-mail 스킬과 동일한 네이버 앱 비밀번호
+NAVER_MAIL_USER=내아이디@naver.com
+NAVER_MAIL_APP_PASSWORD=네이버_SMTP_앱비밀번호
+COLLECTION_REPORT_EMAIL=리포트_받을_주소@naver.com   # 미설정 시 NAVER_MAIL_USER 로 발송
 ```
 빌드타임(공개) 값은 **빌드 시 주입**(아래 4번 build-arg):
 `NEXT_PUBLIC_APP_MODE=live`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
@@ -64,14 +68,14 @@ nginx 리버스 프록시(`proxy_pass 127.0.0.1:3000`, `X-Forwarded-For` 전달)
 ```
 curl -XPOST -H "x-agent-secret: 내가_정한_secret" https://no-marathon.kr/api/agent/collect
 ```
-→ `https://no-marathon.kr/admin` 접속 → 관리자 번호 입력 → **staging 항목이 보이면 성공.**
+→ 품질 게이트 통과분은 **즉시 게시**되므로, `https://no-marathon.kr` 메인/우회 페이지에 **대회가 바로 보이면 성공.** (수집 리포트 메일도 도착)
 
 ---
 
-## ✅ 세팅 끝난 뒤, 내가 평소에 하는 일 (이게 전부)
-1. `https://no-marathon.kr/admin` 접속 → 관리자 번호 입력
-2. **검수 대기(staging)** 항목 확인 → 틀린 내용 있으면 수정 → **"게시"** 클릭
-3. 끝. (이미 게시된 정보가 바뀌었으면 거기서 수정하면 됨)
+## ✅ 세팅 끝난 뒤, 내가 평소에 하는 일 (거의 없음)
+1. 매일 새벽 cron 이 수집 → **품질 통과분 자동 게시** → 결과를 **메일로 받음**. (평소엔 안 봐도 됨)
+2. 메일/사이트에서 **틀린 정보**가 보이면 그때만 `https://no-marathon.kr/admin` 접속 → 수정 또는 보관.
+3. 끝.
 
 > 잘못된 정보가 보이면 `/admin`에서 직접 고치거나, Supabase 대시보드에서 `marathons` 테이블을 직접 수정해도 됩니다.
 
@@ -113,14 +117,15 @@ npm run dev                  # http://localhost:3000
 - `NEXT_PUBLIC_APP_MODE=live`: 실제 Supabase/Claude 연동. secret 주입 필요.
 
 ### 모킹 데이터셋 (`MOCK_DATASET`, mock 모드 전용)
-- `default` 기본 샘플 · `heavy` 대규모(480건/80댓글) · `empty` 빈 상태
-- `file` — **`mock-data/` 폴더의 JSON**(`marathons.json`/`disruptions.json`/`comments.json`)을 읽어
-  DB 로드와 **동일한 경로(store)** 로 주입. 누락 필드는 자동 기본값. 폴더는 `MOCK_DATA_DIR` 로 변경 가능.
-  예) `MOCK_DATASET=file npm run dev` → 폴더 내용이 화면/`/admin`에 그대로 반영.
+- `file`(권장) / `default`(= file) — **`mock-data/` 폴더의 JSON**(`marathons.json`/`disruptions.json`/`comments.json`)을
+  읽어 DB 로드와 **동일한 경로(store)** 로 주입. 누락 필드는 자동 기본값. 폴더는 `MOCK_DATA_DIR` 로 변경 가능.
+- `empty` — 빈 상태.
+- 가짜 샘플/대규모 더미 데이터는 모두 제거됨 — `mock-data/` 에는 실제 수집·정제한 마라톤만 둔다.
+  (불편기록·댓글은 방문자 생성분이라 기본 빈 배열.)
 
 ## 수집 에이전트 (PDF 4-Layer)
 
-마라톤/주최/우회 정보를 Claude API 로 수집·정형화하여 staging 에 적재하고, 개발자 검수 후 published 로 승격한다.
+마라톤/주최/우회 정보를 Claude API 로 수집·정형화하고, 품질 게이트 통과 시 즉시 published 로 게시한다(autoPublish; 틀린 정보는 /admin 에서 사후 수정·보관).
 
 | 동작 | 호출 |
 |---|---|
@@ -131,7 +136,24 @@ npm run dev                  # http://localhost:3000
 live 에서는 worker 가 **web_search(Sonnet)** 로 실제 웹을 검색해 정형화한다. cron 은 **하루 1회 권장**:
 `0 4 * * *` 뒤에 `curl -XPOST -H "x-agent-secret: $AGENT_TRIGGER_SECRET" https://no-marathon.kr/api/agent/collect`
 
-가드레일: per-call max_tokens · per-session 예산 · per-day 쿼터 · 실패율 circuit breaker · LLM-as-judge 품질 임계 · content_hash 중복 회피 · 검색 미확인 값 null. 에이전트는 staging 까지만(자동 게시 금지).
+### 권위 참조 출처(완전성 검증 앵커)
+
+worker 는 매 수집 시 아래 **1차 출처를 반드시 먼저 조회**하고, 후보를 서울시 월별 안내에 **대조**해
+누락을 점검한 뒤, 그 위에 **추가 web_search 로 교차검증**한다(앵커 조회로 끝내지 않음). 정의: SSOT
+[src/lib/agent/sources.ts](src/lib/agent/sources.ts).
+
+- **서울시 월별 「광역 교통통제(예정) 마라톤 안내」** ([news.seoul.go.kr/culture](https://news.seoul.go.kr/culture)) — 그 달 통제 마라톤 전수 목록(완전성 황금 기준).
+- **서울경찰청 교통정보센터(SPATIC)** ([spatic.go.kr](https://www.spatic.go.kr)) — 통제 집행 주체, 구간·시간 원천.
+- **서울 TOPIS** ([topis.seoul.go.kr](https://topis.seoul.go.kr)) — 통제 지도/집회·행사 목록/공공데이터 API.
+- 보강(애그리게이터): 마라톤GO, marathon.pe.kr.
+
+### 수집 리포트 메일(자동)
+
+수집이 끝나면(수동 트리거/cron 무관) **내용·토큰 소모량·비용(USD)** 을 네이버 메일로 발송한다.
+`NAVER_MAIL_USER`/`NAVER_MAIL_APP_PASSWORD` 가 있으면 발송, 없으면 조용히 생략(수집은 정상 진행).
+구현 [src/lib/agent/mail.ts](src/lib/agent/mail.ts).
+
+가드레일: per-call max_tokens · per-session 예산 · per-day 쿼터 · 실패율 circuit breaker · LLM-as-judge 품질 임계 · content_hash 중복 회피 · 검색 미확인 값 null. 품질 게이트 통과분은 즉시 게시(`autoPublish=true`; false 로 두면 staging 수동 검수).
 
 ## 간이 백오피스 (정보 관리)
 

@@ -2,6 +2,13 @@
 
 > 스택·스키마·트레이드오프 결정을 시간순으로 기록. 번복 시 새 항목으로 추가(과거 항목 유지).
 
+## ADR-015 · 수집 즉시 자동 게시 (ADR-010 "자동 published 금지" 번복) — 2026-06-07
+- 결정: 품질 게이트(LLM-as-judge ≥ 7) 통과 수집분을 staging 거치지 않고 **즉시 published** 게시.
+  `AGENT_CONFIG.autoPublish=true`. orchestrator 가 stage 후 `reviewMarathon(id,'publish')` 로 승격.
+- 근거: 운영자 1인 턴키 — 매일 /admin 수동 게시 부담 제거. 사람 검수 대신 자동 품질 게이트로 거른다.
+- 트레이드오프: 사람 검수 생략 → 오게시 위험 ↑. 품질 임계는 유지하고, 틀린 정보는 /admin 에서 사후 수정/보관.
+  `autoPublish=false` 로 두면 ADR-010 원안(수동 검수)으로 복귀. 리포트 메일도 "즉시 게시됨" 으로 반영.
+
 ## ADR-001 · 프론트엔드: Next.js (App Router) — 2026-06-07
 - 결정: Next.js 15 App Router + React 19 + TypeScript(strict).
 - 근거: '여론 조성' 목적상 SSR + OG 메타로 SNS/검색 확산이 중요. 인터랙티브(실시간 집계/댓글)에도 적합.
