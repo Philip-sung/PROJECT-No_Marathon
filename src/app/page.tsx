@@ -1,4 +1,4 @@
-import { isMock, SAMPLE_MARATHONS } from '@/lib/mock';
+import { isMock, MOCK_MARATHONS } from '@/lib/mock';
 
 // Phase 1 부트스트랩 확인용 임시 홈. Phase 3~4 에서 실제 취지 페이지로 대체.
 export default function Home() {
@@ -20,7 +20,7 @@ export default function Home() {
           </span>
         </p>
         <p className="mt-1 text-gray-500">
-          샘플 마라톤: {SAMPLE_MARATHONS[0]?.name ?? '없음'}
+          샘플 마라톤: {MOCK_MARATHONS[0]?.name ?? '없음'}
         </p>
       </div>
     </main>

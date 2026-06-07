@@ -28,3 +28,15 @@
 ## ADR-006 · 배포 출력: standalone — 2026-06-07
 - 결정: next.config `output: 'standalone'` (Vultr Docker 자체호스팅 대비).
 - 근거: prompt.md §03 Vultr VPC 호스팅. Phase 9에서 Dockerfile 로 활용.
+
+## ADR-007 · 쓰기 아키텍처: 서버 경유(service_role) — 2026-06-07
+- 결정: 모든 쓰기(불편입력/댓글/좋아요/신고/이벤트/수집)는 Next Route Handler 에서
+  device_hash 를 IP/UA 로 서버 계산 후 service_role 로 수행. anon 직접 쓰기 전면 거부.
+- 근거: device_hash 는 클라이언트가 스푸핑 가능 → 서버 계산 필수. 서버에서 Zod 검증·
+  과도입력 필터·idempotent upsert 강제. (article 의 guardrail/idempotency 원칙.)
+- 영향: client 는 공개 뷰(anon)로 읽기만, 쓰기는 Phase 5 의 Route Handler 로.
+
+## ADR-008 · 공개 읽기: device_hash 제외 뷰 — 2026-06-07
+- 결정: disruptions/comments 등은 베이스 SELECT 차단, device_hash 를 제외한 뷰
+  (v_*_public)로만 anon 노출. 뷰는 owner 권한 실행(security_invoker off)으로 RLS 우회+컬럼필터.
+- 근거: 익명 식별 해시를 외부에 노출하지 않기 위함(프라이버시/어뷰즈 방지).

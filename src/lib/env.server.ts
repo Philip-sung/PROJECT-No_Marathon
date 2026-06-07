@@ -9,12 +9,15 @@ const serverEnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional().or(z.literal('')),
   ANTHROPIC_API_KEY: z.string().optional().or(z.literal('')),
   REPORT_INBOX_EMAIL: z.string().email().optional().or(z.literal('')),
+  // 기기 해시 salt(익명 식별 안정화). 미설정 시 개발용 기본값 사용.
+  DEVICE_HASH_SALT: z.string().optional().or(z.literal('')),
 });
 
 const parsed = serverEnvSchema.safeParse({
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
   REPORT_INBOX_EMAIL: process.env.REPORT_INBOX_EMAIL,
+  DEVICE_HASH_SALT: process.env.DEVICE_HASH_SALT,
 });
 
 if (!parsed.success) {
