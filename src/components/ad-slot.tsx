@@ -54,10 +54,8 @@ export function AdSlot({
     );
   }
 
-  // 3) placeholder
-  return (
-    <div className="my-2 flex h-24 items-center justify-center rounded-2xl border border-dashed border-line text-xs text-muted/50">
-      {label} (AdSense placeholder)
-    </div>
-  );
+  // 3) AdSense 미도입(client/slot 미설정) → 아무것도 렌더하지 않음(빈 슬롯 숨김).
+  //    도입 시 NEXT_PUBLIC_ADSENSE_CLIENT(+SLOT) 만 주입하면 위 (2) 경로로 자동 표시.
+  void label;
+  return null;
 }
