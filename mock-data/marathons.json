@@ -11,8 +11,14 @@
     "organizer_name": "○○마라톤조직위",
     "organizer_url": "https://example.org",
     "organizer_email": "organizer@example.org",
-    "detour_info": { "subway": ["1호선 종각역 이용"], "bus": ["간선 03번 우회"] },
-    "control_zone": { "center": { "lat": 37.5759, "lng": 126.9769 }, "radius_m": 1500 },
+    "detour_info": {
+      "subway": ["1호선 종각역 이용"],
+      "bus": ["간선 03번 우회"]
+    },
+    "control_zone": {
+      "center": { "lat": 37.5759, "lng": 126.9769 },
+      "radius_m": 1500
+    },
     "status": "published"
   },
   {
@@ -22,7 +28,10 @@
     "area": "여의도·마포대교 일대",
     "lat": 37.5285,
     "lng": 126.9325,
-    "control_zone": { "center": { "lat": 37.5285, "lng": 126.9325 }, "radius_m": 1200 },
+    "control_zone": {
+      "center": { "lat": 37.5285, "lng": 126.9325 },
+      "radius_m": 1200
+    },
     "status": "published"
   }
 ]
