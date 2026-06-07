@@ -75,7 +75,9 @@ export function DetourView() {
         {status === 'granted' && distanceKm !== null ? (
           <p className="text-sm">
             현재 위치는 통제 구간(<b className="text-fg">{selected.area}</b>
-            )에서 약 <b className="text-accent">{distanceKm.toFixed(1)}km</b>{' '}
+            )에서 약 <b className="text-accent">
+              {distanceKm.toFixed(1)}km
+            </b>{' '}
             떨어져 있습니다.{' '}
             {distanceKm > 3
               ? '직접 영향은 크지 않을 수 있으나, 통과 경로라면 아래 안내를 참고하세요.'

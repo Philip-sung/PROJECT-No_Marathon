@@ -5,12 +5,7 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: [
-          'Pretendard Variable',
-          'Pretendard',
-          'system-ui',
-          'sans-serif',
-        ],
+        sans: ['Pretendard Variable', 'Pretendard', 'system-ui', 'sans-serif'],
       },
       colors: {
         // 다크 미래지향 팔레트
