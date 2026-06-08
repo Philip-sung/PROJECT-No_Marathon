@@ -79,6 +79,9 @@ async function collect(
 
   const results: TargetResult[] = [];
   const stagedDetails: StagedSummary[] = [];
+  // pass-forward: 앞 타깃이 발견한 후보를 누적해 다음 타깃에 넘긴다(앵커 중복 검색 제거).
+  const discovered: NormalizedMarathon[] = [];
+  const discoveredKeys = new Set<string>();
   let sessionCost = 0;
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
@@ -113,7 +116,8 @@ async function collect(
     let candidates: NormalizedMarathon[] = [];
     let workerFailed = false;
     try {
-      const research = await researchMarathon(target);
+      // discovered(앞 타깃 누적)를 넘겨 앵커 재조회를 끄고 교차검증 모드로 돌린다.
+      const research = await researchMarathon(target, discovered);
       totalInputTokens += research.usage.input_tokens;
       totalOutputTokens += research.usage.output_tokens;
       // web_search 비용은 worker 호출당 1회 — 리스트 길이와 무관하게 한 번만 가산.
@@ -124,6 +128,14 @@ async function collect(
       );
       sessionCost += workerCost;
       candidates = research.data;
+      // 다음 타깃에 넘길 후보 누적(이름+날짜 기준 중복 제거로 힌트 목록을 가볍게 유지).
+      for (const c of candidates) {
+        const key = `${c.name}|${c.event_date}`;
+        if (!discoveredKeys.has(key)) {
+          discoveredKeys.add(key);
+          discovered.push(c);
+        }
+      }
       // 검색 비용을 원장에 적재 — 일일 quota(todayCostUsd)가 이 합을 읽으므로 누락 금지.
       await logCollectionSafe({
         run_id: runId,
