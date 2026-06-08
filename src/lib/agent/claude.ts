@@ -53,6 +53,8 @@ export class StructuredCallError extends Error {
 }
 
 // 최상위가 객체 {…} 또는 배열 […] 인 JSON 을 본문에서 추출. worker 는 배열을 반환한다.
+// 첫 여는 괄호부터 **균형이 맞는 지점까지만** 잘라, JSON 뒤에 모델이 덧붙인 잡텍스트
+// ("...after JSON" 파싱오류의 원인)를 무시한다. 문자열·이스케이프는 깊이 계산에서 제외.
 function extractJson(text: string): unknown {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   const raw = (fenced?.[1] ?? text).trim();
@@ -61,11 +63,38 @@ function extractJson(text: string): unknown {
   const arrStart = raw.indexOf('[');
   const useArray = arrStart !== -1 && (objStart === -1 || arrStart < objStart);
   const start = useArray ? arrStart : objStart;
-  const end = useArray ? raw.lastIndexOf(']') : raw.lastIndexOf('}');
-  if (start === -1 || end === -1 || end < start) {
+  if (start === -1) {
     throw new Error('응답에서 JSON 을 찾지 못했습니다.');
   }
-  return JSON.parse(raw.slice(start, end + 1));
+  const open = raw[start];
+  const close = open === '[' ? ']' : '}';
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  for (let i = start; i < raw.length; i += 1) {
+    const ch = raw[i];
+    if (inStr) {
+      if (esc) {
+        esc = false;
+      } else if (ch === '\\') {
+        esc = true;
+      } else if (ch === '"') {
+        inStr = false;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inStr = true;
+    } else if (ch === open) {
+      depth += 1;
+    } else if (ch === close) {
+      depth -= 1;
+      if (depth === 0) {
+        return JSON.parse(raw.slice(start, i + 1));
+      }
+    }
+  }
+  throw new Error('JSON 괄호 균형이 맞지 않습니다(응답이 잘렸을 수 있음).');
 }
 
 export async function callStructured<S extends z.ZodTypeAny>(
