@@ -6,11 +6,30 @@ import { getResearchTargets } from '@/lib/agent/targets';
 import { researchMarathon } from '@/lib/agent/worker';
 import { judgeQuality } from '@/lib/agent/judge';
 import { contentHash } from '@/lib/agent/hash';
+import { StructuredCallError } from '@/lib/agent/claude';
 import * as repo from '@/lib/agent/repo';
 import { sendCollectionReport, type StagedSummary } from '@/lib/agent/mail';
 import { notify } from '@/lib/observability/notify';
 import { logger } from '@/lib/observability/logger';
-import type { CollectionRunResult, TargetResult } from '@/lib/agent/types';
+import type {
+  CollectionRunResult,
+  NormalizedMarathon,
+  TargetResult,
+} from '@/lib/agent/types';
+
+/** 원장 기록은 best-effort — DB 쓰기 실패가 수집/게시를 막지 않게 감싼다. */
+async function logCollectionSafe(
+  entry: Parameters<typeof repo.logCollection>[0],
+): Promise<void> {
+  try {
+    await repo.logCollection(entry);
+  } catch (err) {
+    logger.warn('collection_log_write_failed', {
+      run_id: entry.run_id,
+      message: err instanceof Error ? err.message : '알 수 없는 오류',
+    });
+  }
+}
 
 /**
  * L3 Orchestrator-Worker + L4 Guardrails 통합 heartbeat(1회 실행).
@@ -90,127 +109,205 @@ async function collect(
       break;
     }
 
+    // ── worker: 한 타깃에서 그 달 마라톤을 전부 열거(리스트) ──
+    let candidates: NormalizedMarathon[] = [];
+    let workerFailed = false;
     try {
       const research = await researchMarathon(target);
       totalInputTokens += research.usage.input_tokens;
       totalOutputTokens += research.usage.output_tokens;
-      let cost = estimateCostUsd(
+      // web_search 비용은 worker 호출당 1회 — 리스트 길이와 무관하게 한 번만 가산.
+      const workerCost = estimateCostUsd(
         AGENT_CONFIG.workerModel,
         research.usage.input_tokens,
         research.usage.output_tokens,
       );
+      sessionCost += workerCost;
+      candidates = research.data;
+      // 검색 비용을 원장에 적재 — 일일 quota(todayCostUsd)가 이 합을 읽으므로 누락 금지.
+      await logCollectionSafe({
+        run_id: runId,
+        target: target.query,
+        content_hash: null,
+        status: candidates.length > 0 ? 'success' : 'skipped',
+        quality_score: null,
+        model: AGENT_CONFIG.workerModel,
+        cost_usd: workerCost,
+        nowIso,
+      });
+    } catch (err) {
+      workerFailed = true;
+      failures += 1;
+      // #5: 실패해도 usage 를 회수해 비용·예산 가드에 반영(실패 호출이 예산을 안 보이게 빠져나가지 못하게).
+      let workerCost = 0;
+      if (err instanceof StructuredCallError) {
+        totalInputTokens += err.usage.input_tokens;
+        totalOutputTokens += err.usage.output_tokens;
+        workerCost = estimateCostUsd(
+          AGENT_CONFIG.workerModel,
+          err.usage.input_tokens,
+          err.usage.output_tokens,
+        );
+        sessionCost += workerCost;
+      }
+      const message = err instanceof Error ? err.message : '알 수 없는 오류';
+      await logCollectionSafe({
+        run_id: runId,
+        target: target.query,
+        content_hash: null,
+        status: 'failure',
+        quality_score: null,
+        model: AGENT_CONFIG.workerModel,
+        cost_usd: workerCost,
+        nowIso,
+      });
+      results.push({
+        target: target.query,
+        outcome: 'failed',
+        quality_score: null,
+        cost_usd: workerCost,
+        notes: message,
+      });
+    }
 
+    // 그 달 도로통제 대회가 없으면(정상) 한 줄 남기고 다음 타깃.
+    if (!workerFailed && candidates.length === 0) {
+      results.push({
+        target: target.query,
+        outcome: 'empty',
+        quality_score: null,
+        cost_usd: 0,
+        notes: '도로통제 수반 대회 없음',
+      });
+    }
+
+    // ── 각 대회: dedup → judge → stage(+publish) ──
+    for (const candidate of candidates) {
       // L2 dedup(content_hash)
-      const hash = contentHash(research.data);
+      const hash = contentHash(candidate);
       if (existing.has(hash)) {
-        sessionCost += cost;
-        await repo.logCollection({
+        await logCollectionSafe({
           run_id: runId,
           target: target.query,
           content_hash: hash,
           status: 'skipped',
           quality_score: null,
           model: AGENT_CONFIG.workerModel,
-          cost_usd: cost,
+          cost_usd: 0,
           nowIso,
         });
         results.push({
           target: target.query,
           outcome: 'skipped_duplicate',
           quality_score: null,
-          cost_usd: cost,
-          notes: '동일 content_hash 존재',
+          cost_usd: 0,
+          notes: `${candidate.name} (동일 content_hash)`,
         });
         continue;
       }
 
-      // LLM-as-judge 품질 게이트
-      const judged = await judgeQuality(research.data);
-      totalInputTokens += judged.usage.input_tokens;
-      totalOutputTokens += judged.usage.output_tokens;
-      cost += estimateCostUsd(
-        AGENT_CONFIG.judgeModel,
-        judged.usage.input_tokens,
-        judged.usage.output_tokens,
-      );
-      sessionCost += cost;
+      // LLM-as-judge 품질 게이트(judge 비용은 대회 1건당 1회)
+      let judgeCost = 0;
+      let score: number;
+      let issues: string[];
+      try {
+        const judged = await judgeQuality(candidate);
+        totalInputTokens += judged.usage.input_tokens;
+        totalOutputTokens += judged.usage.output_tokens;
+        judgeCost = estimateCostUsd(
+          AGENT_CONFIG.judgeModel,
+          judged.usage.input_tokens,
+          judged.usage.output_tokens,
+        );
+        sessionCost += judgeCost;
+        score = judged.data.score;
+        issues = judged.data.issues;
+      } catch (err) {
+        failures += 1;
+        if (err instanceof StructuredCallError) {
+          totalInputTokens += err.usage.input_tokens;
+          totalOutputTokens += err.usage.output_tokens;
+          judgeCost = estimateCostUsd(
+            AGENT_CONFIG.judgeModel,
+            err.usage.input_tokens,
+            err.usage.output_tokens,
+          );
+          sessionCost += judgeCost;
+        }
+        const message = err instanceof Error ? err.message : '알 수 없는 오류';
+        results.push({
+          target: target.query,
+          outcome: 'failed',
+          quality_score: null,
+          cost_usd: judgeCost,
+          notes: `judge 실패(${candidate.name}): ${message}`,
+        });
+        continue;
+      }
 
-      if (judged.data.score < AGENT_CONFIG.qualityThreshold) {
-        await repo.logCollection({
+      if (score < AGENT_CONFIG.qualityThreshold) {
+        await logCollectionSafe({
           run_id: runId,
           target: target.query,
           content_hash: hash,
           status: 'failure',
-          quality_score: judged.data.score,
+          quality_score: score,
           model: AGENT_CONFIG.judgeModel,
-          cost_usd: cost,
+          cost_usd: judgeCost,
           nowIso,
         });
         results.push({
           target: target.query,
           outcome: 'rejected_quality',
-          quality_score: judged.data.score,
-          cost_usd: cost,
-          notes: judged.data.issues.join(', ') || '품질 임계 미달',
+          quality_score: score,
+          cost_usd: judgeCost,
+          notes: `${candidate.name}: ${issues.join(', ') || '품질 임계 미달'}`,
         });
         continue;
       }
 
-      // 적재 후, autoPublish 면 즉시 게시(품질 게이트 통과분만). 아니면 staging 유지.
-      const newId = await repo.stageMarathon(research.data, hash, nowIso);
-      existing.add(hash);
-      if (AGENT_CONFIG.autoPublish) {
-        await repo.reviewMarathon(newId, 'publish');
-      }
-      stagedDetails.push({
-        name: research.data.name,
-        event_date: research.data.event_date,
-        area: research.data.area,
-        source: research.data.source ?? null,
-        quality_score: judged.data.score,
-      });
-      await repo.logCollection({
-        run_id: runId,
-        target: target.query,
-        content_hash: hash,
-        status: AGENT_CONFIG.autoPublish ? 'success' : 'pending_review',
-        quality_score: judged.data.score,
-        model: AGENT_CONFIG.judgeModel,
-        cost_usd: cost,
-        nowIso,
-      });
-      results.push({
-        target: target.query,
-        outcome: 'staged',
-        quality_score: judged.data.score,
-        cost_usd: cost,
-        notes: null,
-      });
-    } catch (err) {
-      failures += 1;
-      const message = err instanceof Error ? err.message : '알 수 없는 오류';
-      // 실패 로깅도 best-effort(DB 장애 시 수집·보고가 멈추지 않게).
+      // 적재 후, autoPublish 면 즉시 게시(품질 통과분만). DB 쓰기 실패는 그 1건만 실패 처리.
       try {
-        await repo.logCollection({
+        const newId = await repo.stageMarathon(candidate, hash, nowIso);
+        existing.add(hash);
+        if (AGENT_CONFIG.autoPublish) {
+          await repo.reviewMarathon(newId, 'publish');
+        }
+        stagedDetails.push({
+          name: candidate.name,
+          event_date: candidate.event_date,
+          area: candidate.area,
+          source: candidate.source ?? null,
+          quality_score: score,
+        });
+        await logCollectionSafe({
           run_id: runId,
           target: target.query,
-          content_hash: null,
-          status: 'failure',
-          quality_score: null,
-          model: AGENT_CONFIG.workerModel,
-          cost_usd: 0,
+          content_hash: hash,
+          status: AGENT_CONFIG.autoPublish ? 'success' : 'pending_review',
+          quality_score: score,
+          model: AGENT_CONFIG.judgeModel,
+          cost_usd: judgeCost,
           nowIso,
         });
-      } catch {
-        // 무시 — 결과/메일에는 아래 notes 로 남음.
+        results.push({
+          target: target.query,
+          outcome: 'staged',
+          quality_score: score,
+          cost_usd: judgeCost,
+          notes: candidate.name,
+        });
+      } catch (err) {
+        failures += 1;
+        const message = err instanceof Error ? err.message : '알 수 없는 오류';
+        results.push({
+          target: target.query,
+          outcome: 'failed',
+          quality_score: score,
+          cost_usd: judgeCost,
+          notes: `적재 실패(${candidate.name}): ${message}`,
+        });
       }
-      results.push({
-        target: target.query,
-        outcome: 'failed',
-        quality_score: null,
-        cost_usd: 0,
-        notes: message,
-      });
     }
 
     // L4 anomaly circuit breaker — 실패율 초과 시 중단 + escalate

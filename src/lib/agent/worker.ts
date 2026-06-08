@@ -2,7 +2,7 @@ import 'server-only';
 import { callStructured } from '@/lib/agent/claude';
 import { AGENT_CONFIG, WEB_SEARCH_TOOL } from '@/lib/agent/config';
 import {
-  NormalizedMarathonSchema,
+  NormalizedMarathonListSchema,
   type NormalizedMarathon,
   type Usage,
 } from '@/lib/agent/types';
@@ -38,24 +38,30 @@ const WORKER_SYSTEM = [
   '점유하는 행사)도 포함하세요. 종합 일정(마라톤GO·KorMarathon)에서 그 달 서울 대회를 한 번에',
   '확인하되, 과도한 반복 검색은 피하고 도로 교통통제를 수반하는 대회만 추리세요.',
   '',
-  '[정형화] 다음 필드를 채우세요: 마라톤명, 날짜(YYYY-MM-DD), 통제 시간(start_time/end_time, ISO8601),',
-  '영향 지역(area), 통제구간(control_zone: center{lat,lng}/radius_m), 주최측(이름/홈페이지/연락처/이메일),',
-  '우회 안내(detour_info: 지하철/버스 목록). 신뢰할 수 있는 출처(주최측/관할기관/뉴스)를 우선하세요.',
+  '[정형화] 발견한 **모든** 대회 각각에 대해 다음 필드를 채우세요: 마라톤명, 날짜(YYYY-MM-DD),',
+  '통제 시간(start_time/end_time, ISO8601), 영향 지역(area), 통제구간(control_zone: center{lat,lng}/radius_m),',
+  '주최측(이름/홈페이지/연락처/이메일), 우회 안내(detour_info: 지하철/버스 목록).',
+  '신뢰할 수 있는 출처(주최측/관할기관/뉴스)를 우선하세요.',
   '',
   '[거짓 정보 금지] 검색으로 확인되지 않은 값은 추측하지 말고 반드시 null 로 두세요.',
-  '확인한 핵심 근거 URL 을 source 에 기록하세요.',
+  '확인한 핵심 근거 URL 을 각 대회의 source 에 기록하세요.',
+  '',
+  '[출력 형식] 최상위는 **마라톤 객체들의 JSON 배열**(`[ { …대회1… }, { …대회2… } ]`) 하나만 출력하세요.',
+  '대회가 1건이면 원소 1개짜리 배열, 해당 월에 도로통제 대회가 없으면 빈 배열 `[]` 을 출력하세요.',
+  '배열 외의 설명·머리말·코드펜스는 절대 쓰지 마세요.',
 ].join('\n');
 
 export async function researchMarathon(
   target: ResearchTarget,
-): Promise<{ data: NormalizedMarathon; usage: Usage }> {
+): Promise<{ data: NormalizedMarathon[]; usage: Usage }> {
   return callStructured({
     model: AGENT_CONFIG.workerModel,
     system: WORKER_SYSTEM,
-    prompt: `다음 주제로 실제 마라톤 정보를 검색·정형화하세요: "${target.query}". 신뢰할 수 있는 출처(주최측/관할기관/뉴스)를 우선하세요.`,
-    schema: NormalizedMarathonSchema,
+    prompt: `다음 주제로 실제 마라톤 정보를 검색·정형화하세요: "${target.query}". 신뢰할 수 있는 출처(주최측/관할기관/뉴스)를 우선하세요. 해당하는 대회를 모두 찾아 배열로 반환하세요.`,
+    schema: NormalizedMarathonListSchema,
     maxTokens: AGENT_CONFIG.maxTokens,
     tools: [WEB_SEARCH_TOOL],
-    mock: () => MOCK_RESEARCH[target.key] ?? MOCK_RESEARCH_FALLBACK,
+    // mock 은 단일 canned 결과를 1원소 배열로 감싼다(datasets 변경 없이 리스트 계약 충족).
+    mock: () => [MOCK_RESEARCH[target.key] ?? MOCK_RESEARCH_FALLBACK],
   });
 }

@@ -38,12 +38,31 @@ const MessagesResponseSchema = z.object({
   }),
 });
 
+/**
+ * 구조적 호출 실패. **실패해도 그때까지 소모한 usage 를 보존**해, 호출자(orchestrator)가
+ * 비용·예산 가드에 반영하게 한다. (파싱 실패 시 usage 가 유실되면 실패한 호출이 예산을
+ * 안 보이게 빠져나가 가드가 무력화되는 버그를 막는다.)
+ */
+export class StructuredCallError extends Error {
+  readonly usage: Usage;
+  constructor(message: string, usage: Usage) {
+    super(message);
+    this.name = 'StructuredCallError';
+    this.usage = usage;
+  }
+}
+
+// 최상위가 객체 {…} 또는 배열 […] 인 JSON 을 본문에서 추출. worker 는 배열을 반환한다.
 function extractJson(text: string): unknown {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const raw = fenced?.[1] ?? text;
-  const start = raw.indexOf('{');
-  const end = raw.lastIndexOf('}');
-  if (start === -1 || end === -1) {
+  const raw = (fenced?.[1] ?? text).trim();
+  // 객체와 배열 중 **먼저 등장하는** 쪽을 최상위로 본다.
+  const objStart = raw.indexOf('{');
+  const arrStart = raw.indexOf('[');
+  const useArray = arrStart !== -1 && (objStart === -1 || arrStart < objStart);
+  const start = useArray ? arrStart : objStart;
+  const end = useArray ? raw.lastIndexOf(']') : raw.lastIndexOf('}');
+  if (start === -1 || end === -1 || end < start) {
     throw new Error('응답에서 JSON 을 찾지 못했습니다.');
   }
   return JSON.parse(raw.slice(start, end + 1));
@@ -67,7 +86,7 @@ export async function callStructured<S extends z.ZodTypeAny>(
   const system = [
     {
       type: 'text',
-      text: `${opts.system}\n\n작업이 끝나면 반드시 유효한 JSON 객체 하나만 출력하세요. 그 외 설명/문장 금지.`,
+      text: `${opts.system}\n\n작업이 끝나면 반드시 유효한 JSON 만 출력하세요(머리말·설명·코드펜스 없이). JSON 의 형식(객체/배열)은 위 지시를 따르세요.`,
       cache_control: { type: 'ephemeral' },
     },
   ];
@@ -97,9 +116,11 @@ export async function callStructured<S extends z.ZodTypeAny>(
 
     if (!res.ok) {
       // 에러 본문까지 surface — 400 등 원인 진단·메일 보고용(status 만으론 알 수 없음).
+      // usage 를 실어 보내, 재개 도중 실패했을 때 누적분이 예산 가드에서 누락되지 않게 한다.
       const body = await res.text().catch(() => '');
-      throw new Error(
+      throw new StructuredCallError(
         `Anthropic API 오류: ${res.status}${body ? ` — ${body.slice(0, 400)}` : ''}`,
+        usage,
       );
     }
 
@@ -131,5 +152,11 @@ export async function callStructured<S extends z.ZodTypeAny>(
     break;
   }
 
-  return { data: opts.schema.parse(extractJson(finalText)), usage };
+  // 파싱/검증 실패해도 usage 를 보존해 던진다(비용·예산 가드가 실패 호출의 토큰을 보게).
+  try {
+    return { data: opts.schema.parse(extractJson(finalText)), usage };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new StructuredCallError(message, usage);
+  }
 }

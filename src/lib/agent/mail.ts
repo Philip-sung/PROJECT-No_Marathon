@@ -52,6 +52,7 @@ const OUTCOME_LABEL: Record<string, string> = {
   rejected_quality: '품질 미달 반려',
   failed: '실패',
   aborted_budget: '예산 중단',
+  empty: '수집 결과 없음',
 };
 
 export function buildReportSubject(d: CollectionReportData): string {

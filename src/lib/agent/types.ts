@@ -36,6 +36,19 @@ export const NormalizedMarathonSchema = z.object({
 });
 export type NormalizedMarathon = z.infer<typeof NormalizedMarathonSchema>;
 
+/**
+ * worker 는 한 타깃에서 "그 달 도로통제 마라톤을 전부 열거"하므로 결과가 리스트다.
+ * 모델이 대회 1건이라 단일 객체로 반환해도 관용적으로 [객체] 로 정규화한다
+ * (배열 강제 실패로 호출 전체를 버리지 않도록).
+ */
+export const NormalizedMarathonListSchema = z.preprocess(
+  (v) => (Array.isArray(v) ? v : [v]),
+  z.array(NormalizedMarathonSchema),
+);
+export type NormalizedMarathonList = z.infer<
+  typeof NormalizedMarathonListSchema
+>;
+
 /** LLM-as-judge 결과. */
 export const JudgeResultSchema = z.object({
   score: z.number().min(0).max(10),
@@ -55,7 +68,8 @@ export type TargetOutcome =
   | 'skipped_duplicate'
   | 'rejected_quality'
   | 'failed'
-  | 'aborted_budget';
+  | 'aborted_budget'
+  | 'empty';
 
 export interface TargetResult {
   target: string;

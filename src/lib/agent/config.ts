@@ -6,12 +6,13 @@ export const AGENT_CONFIG = {
   // L1 per-call
   //
   // 호출 1회 worst-case = maxInputTokensPerCall×입력단가 + maxTokens×출력단가.
-  //   Sonnet 기준: 50,000×$3/1M + 2,048×$15/1M = $0.15 + $0.031 ≈ $0.18/호출.
-  // 실측(데모 검색 + 비용사고 데이터): 입력 피크 ~33k, 출력 JSON ~300–450 토큰.
-  // → 출력은 worst-case의 ~17%뿐이라 max_tokens 는 칼자루가 아니고, 2048 밑으로
-  //   내리면 JSON 이 잘려 extractJson 파싱이 실패(호출 통째 낭비)하므로 2048 유지.
-  //   실효 칼자루는 입력 상한 — 실측 피크 ~33k 에 헤드룸 1.5x 로 50k.
-  maxTokens: 2048,
+  //   Sonnet 기준: 50,000×$3/1M + 8,192×$15/1M = $0.15 + $0.123 ≈ $0.27/호출.
+  // max_tokens 는 "천장"일 뿐 **실제 생성분만 과금**된다(8192 라도 출력 3k 면 3k 만 청구).
+  // worker 는 "그 달 마라톤을 전부 열거"해 **배열**로 반환하므로, 2048 이면 여러 건이
+  //   중간에 잘려(JSON.parse 실패=호출 통째 낭비) → 배열이 안 잘리게 8192 로 상향.
+  //   (judge 는 단일 점수라 작아서 별도 512 — judge.ts 에서 직접 지정.)
+  // 실효 비용 칼자루는 여전히 입력 상한(maxInputTokensPerCall) — 실측 피크 ~33k 에 1.5x.
+  maxTokens: 8192,
   // 호출당 web_search 횟수 상한(비용 폭주 차단의 1순위 레버).
   maxWebSearchUses: 4,
   // 호출당 누적 입력 토큰 상한 — pause_turn 재개 루프가 이 값을 넘으면 즉시 중단.
