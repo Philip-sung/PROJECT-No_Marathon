@@ -64,7 +64,9 @@ export async function todayCostUsd(todayPrefix: string): Promise<number> {
     // 관리자 Supabase 미구성 = 일일 비용 원장을 읽을 수단이 없음. 0 을 돌려주면
     // L3 일일 비용 천장이 조용히 무력화되어(폭주 사고의 구조) 비용이 무한 누적될 수
     // 있으므로, "읽을 수 없음"을 명시적으로 알려 호출자가 fail-safe 로 중단하게 한다.
-    throw new Error('관리자 Supabase 미구성 — 일일 비용 원장을 읽을 수 없습니다.');
+    throw new Error(
+      '관리자 Supabase 미구성 — 일일 비용 원장을 읽을 수 없습니다.',
+    );
   }
   const { data, error } = await supabase
     .from('ai_collection_log')

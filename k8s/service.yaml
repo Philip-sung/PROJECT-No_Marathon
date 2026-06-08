@@ -6,7 +6,7 @@ spec:
   selector:
     app: no-marathon-pod
   ports:
-  - protocol: TCP
-    port: 80
-    targetPort: 3000
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
   type: ClusterIP

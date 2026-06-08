@@ -15,23 +15,23 @@ spec:
       imagePullSecrets:
         - name: ghcr-cred-philip-sung
       containers:
-      - name: no-marathon
-        image: ghcr.io/philip-sung/no-marathon-image:latest
-        imagePullPolicy: Always
-        ports:
-        - containerPort: 3000
-        envFrom:
-        - secretRef:
-            name: no-marathon-env
-        readinessProbe:
-          httpGet:
-            path: /api/health
-            port: 3000
-          initialDelaySeconds: 5
-          periodSeconds: 10
-        livenessProbe:
-          httpGet:
-            path: /api/health
-            port: 3000
-          initialDelaySeconds: 15
-          periodSeconds: 20
+        - name: no-marathon
+          image: ghcr.io/philip-sung/no-marathon-image:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - secretRef:
+                name: no-marathon-env
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
