@@ -14,7 +14,9 @@ import {
  */
 const JUDGE_SYSTEM =
   '당신은 수집된 마라톤 정보의 품질을 평가하는 심사자입니다. ' +
-  '완전성(날짜/지역/주최/연락/우회), 구체성, 신뢰성을 기준으로 0~10 점과 문제점 목록을 JSON 으로 출력하세요.';
+  '완전성(날짜/지역/주최/연락/우회), 구체성, 신뢰성을 기준으로 평가합니다. ' +
+  '출력은 정확히 `{"score": 0~10 숫자, "issues": ["짧은 문제 1", ...]}` JSON 객체 하나만. ' +
+  'issues 는 최대 5개, 각 항목은 짧은 한 구절로. 그 외 필드·설명·머리말 절대 금지.';
 
 /** mock 결정론 채점 — 완전성 기반 휴리스틱. */
 function mockScore(c: NormalizedMarathon): JudgeResult {
@@ -51,7 +53,8 @@ export async function judgeQuality(
     system: JUDGE_SYSTEM,
     prompt: `다음 정형 데이터를 평가하세요:\n${JSON.stringify(candidate)}`,
     schema: JudgeResultSchema,
-    maxTokens: 512,
+    // 512 는 verbose 채점 출력에 부족해 잘림(괄호 불균형 실패) → 여유 상향.
+    maxTokens: 1024,
     mock: () => mockScore(candidate),
   });
 }
