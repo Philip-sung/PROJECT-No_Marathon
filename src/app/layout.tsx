@@ -6,19 +6,38 @@ import { Analytics } from '@/components/analytics';
 import { ToastProvider } from '@/components/ui/toast';
 import { env } from '@/lib/env';
 
-// SEO/SNS 확산 기반(여론 조성 목적). Phase 3에서 OG 이미지·페이지별 메타 확장.
+// SEO/SNS 확산 기반(여론 조성 목적). OG 이미지(public/og.png)는 scripts/generate-og.mjs 로 생성.
+const SITE_TITLE = 'no-marathon.kr — 주말 마라톤 교통 불편, 함께 기록합니다';
+const SITE_DESC =
+  '서울 주말 마라톤 교통통제로 인한 시민 불편을 기록하고, 대책을 요구하며, 우회 정보를 제공합니다.';
+
 export const metadata: Metadata = {
   metadataBase: new URL('https://no-marathon.kr'),
   title: {
-    default: 'no-marathon.kr — 주말 마라톤 교통 불편, 함께 기록합니다',
+    default: SITE_TITLE,
     template: '%s | no-marathon.kr',
   },
-  description:
-    '서울 주말 마라톤 교통통제로 인한 시민 불편을 기록하고, 대책을 요구하며, 우회 정보를 제공합니다.',
+  description: SITE_DESC,
   openGraph: {
     type: 'website',
     locale: 'ko_KR',
     siteName: 'no-marathon.kr',
+    title: SITE_TITLE,
+    description: SITE_DESC,
+    images: [
+      {
+        url: '/og.png',
+        width: 1200,
+        height: 630,
+        alt: '마라톤 교통불편으로 손해본 시간 : 기록중.. — no-marathon.kr',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: SITE_TITLE,
+    description: SITE_DESC,
+    images: ['/og.png'],
   },
   robots: { index: true, follow: true },
 };

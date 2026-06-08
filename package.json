@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "og": "node scripts/generate-og.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "kube-apply": "kubectl apply -f k8s/deployment.yaml && kubectl apply -f k8s/service.yaml",
