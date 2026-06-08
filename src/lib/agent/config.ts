@@ -28,8 +28,9 @@ export const AGENT_CONFIG = {
   dailyQuotaUsd: 3.0,
   // L4 anomaly circuit breaker
   maxFailureRate: 0.5, // run 내 실패율이 이 값을 넘으면 중단+escalate
-  // 품질 게이트(LLM-as-judge)
-  qualityThreshold: 7.0,
+  // 품질 게이트(LLM-as-judge). 핵심(대회명·날짜·지역)만 있으면 통과시키는 정책이라
+  // 선택 필드(주최 연락처·우회 등) 누락으로 반려하지 않도록 임계를 낮춘다(judge 변동성 여유 포함).
+  qualityThreshold: 6.0,
   // 수집 즉시 자동 게시(true) — 사람 검수(staging) 생략. 품질 게이트는 그대로 유지.
   // false 면 staging 까지만 적재하고 /admin 에서 수동 게시(ADR-007 원안).
   autoPublish: true,
