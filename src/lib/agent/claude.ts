@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { isMock } from '@/lib/env';
 import { serverEnv } from '@/lib/env.server';
 import { AGENT_CONFIG } from '@/lib/agent/config';
+import { logger } from '@/lib/observability/logger';
 import type { Usage } from '@/lib/agent/types';
 
 /**
@@ -181,11 +182,23 @@ export async function callStructured<S extends z.ZodTypeAny>(
     break;
   }
 
+  // 진단용: 모델 "원본 출력" 앞부분을 로그로 남긴다 — 파싱·드롭 원인을 Zod 에러로
+  // 역추정하지 않고, 실제로 모델이 어떤 키·구조로 뱉었는지 실측으로 본다.
+  logger.info('structured_call_raw', {
+    model: opts.model,
+    output_tokens: usage.output_tokens,
+    raw_head: finalText.slice(0, 1500),
+  });
+
   // 파싱/검증 실패해도 usage 를 보존해 던진다(비용·예산 가드가 실패 호출의 토큰을 보게).
+  // 실패 시 원본 앞부분을 메시지에 동봉 → 메일/로그에서 어긋난 형태를 바로 확인.
   try {
     return { data: opts.schema.parse(extractJson(finalText)), usage };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    throw new StructuredCallError(message, usage);
+    throw new StructuredCallError(
+      `${message}\n[모델 원본 출력 앞부분] ${finalText.slice(0, 500)}`,
+      usage,
+    );
   }
 }
