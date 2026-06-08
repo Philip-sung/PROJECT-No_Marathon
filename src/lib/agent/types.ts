@@ -63,7 +63,12 @@ export const NormalizedMarathonSchema = z.object({
   organizer_contact: z.string().nullable().optional(),
   organizer_email: z.string().nullable().optional(),
   detour_info: z.preprocess((v) => (v == null ? {} : v), DetourInfoSchema),
-  source: z.string().nullable().optional(),
+  // 모델이 근거 URL 을 여러 개(배열)로 줄 수 있다 → 첫 문자열 하나로 흡수.
+  source: z.preprocess(
+    (v) =>
+      Array.isArray(v) ? (v.find((x) => typeof x === 'string') ?? null) : v,
+    z.string().nullable().optional(),
+  ),
 });
 export type NormalizedMarathon = z.infer<typeof NormalizedMarathonSchema>;
 
