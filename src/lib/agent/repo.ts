@@ -313,3 +313,82 @@ export async function reviewMarathon(
   }
   return Array.isArray(data) && data.length > 0;
 }
+
+/**
+ * 마라톤 하드 삭제(행 제거). FK on delete cascade 로 해당 대회의 disruptions/comments/
+ * comment_likes 도 함께 삭제된다(events 는 set null). 되돌릴 수 없으므로 관리자 전용.
+ */
+export async function deleteMarathon(id: string): Promise<boolean> {
+  if (isMock) {
+    return store.deleteMarathon(id);
+  }
+  const supabase = createAdminSupabase();
+  if (!supabase) {
+    return false;
+  }
+  const { data, error } = await supabase
+    .from('marathons')
+    .delete()
+    .eq('id', id)
+    .select('id');
+  if (error) {
+    throw new Error(`마라톤 삭제 실패: ${error.message}`);
+  }
+  return Array.isArray(data) && data.length > 0;
+}
+
+export interface MarathonEngagement {
+  disruptions: number;
+  minutes: number;
+  comments: number;
+}
+
+/** 마라톤별 참여 집계(댓글 수·불편 입력 건수·누적 분) — 삭제 전 영향 확인용. */
+export async function marathonEngagement(): Promise<
+  Record<string, MarathonEngagement>
+> {
+  if (isMock) {
+    return store.getMarathonEngagement();
+  }
+  const supabase = createAdminSupabase();
+  if (!supabase) {
+    return {};
+  }
+  const [dRes, cRes] = await Promise.all([
+    supabase.from('disruptions').select('marathon_id, minutes_lost'),
+    supabase.from('comments').select('marathon_id'),
+  ]);
+  if (dRes.error) {
+    throw new Error(`불편 집계 실패: ${dRes.error.message}`);
+  }
+  if (cRes.error) {
+    throw new Error(`댓글 집계 실패: ${cRes.error.message}`);
+  }
+  const dRows = z
+    .array(z.object({ marathon_id: z.string(), minutes_lost: z.number() }))
+    .parse(dRes.data);
+  const cRows = z.array(z.object({ marathon_id: z.string() })).parse(cRes.data);
+  const out: Record<string, MarathonEngagement> = {};
+  const ensure = (id: string): MarathonEngagement => {
+    const cur = out[id];
+    if (cur) {
+      return cur;
+    }
+    const fresh: MarathonEngagement = {
+      disruptions: 0,
+      minutes: 0,
+      comments: 0,
+    };
+    out[id] = fresh;
+    return fresh;
+  };
+  for (const d of dRows) {
+    const e = ensure(d.marathon_id);
+    e.disruptions += 1;
+    e.minutes += d.minutes_lost;
+  }
+  for (const c of cRows) {
+    ensure(c.marathon_id).comments += 1;
+  }
+  return out;
+}

@@ -6,7 +6,16 @@ import { z } from 'zod';
 import { AdminMarathonSchema, type AdminMarathon } from '@/lib/db/schema';
 import { useToast } from '@/components/ui/toast';
 
-const ListResponseSchema = z.object({ marathons: AdminMarathonSchema.array() });
+const StatsSchema = z.object({
+  disruptions: z.number(),
+  minutes: z.number(),
+  comments: z.number(),
+});
+type Stat = z.infer<typeof StatsSchema>;
+const ListResponseSchema = z.object({
+  marathons: AdminMarathonSchema.array(),
+  stats: z.record(z.string(), StatsSchema).default({}),
+});
 
 const inputCls =
   'mt-1 w-full rounded-lg border border-line bg-white/[0.03] px-3 py-2 text-sm text-fg placeholder:text-muted/40 focus:border-accent/50';
@@ -23,6 +32,7 @@ export default function AdminPage() {
   const [passcode, setPasscode] = useState('');
   const [authed, setAuthed] = useState(false);
   const [list, setList] = useState<AdminMarathon[]>([]);
+  const [stats, setStats] = useState<Record<string, Stat>>({});
   const [loading, setLoading] = useState(false);
 
   async function loadList(code: string) {
@@ -43,6 +53,7 @@ export default function AdminPage() {
       const data: unknown = await res.json();
       const parsed = ListResponseSchema.safeParse(data);
       setList(parsed.success ? parsed.data.marathons : []);
+      setStats(parsed.success ? parsed.data.stats : {});
       return true;
     } finally {
       setLoading(false);
@@ -116,6 +127,7 @@ export default function AdminPage() {
               <AdminCard
                 key={m.id}
                 marathon={m}
+                stat={stats[m.id]}
                 passcode={passcode}
                 onSaved={() => loadList(passcode)}
               />
@@ -133,6 +145,7 @@ export default function AdminPage() {
             <AdminCard
               key={m.id}
               marathon={m}
+              stat={stats[m.id]}
               passcode={passcode}
               onSaved={() => loadList(passcode)}
             />
@@ -145,10 +158,12 @@ export default function AdminPage() {
 
 function AdminCard({
   marathon,
+  stat,
   passcode,
   onSaved,
 }: {
   marathon: AdminMarathon;
+  stat?: Stat;
   passcode: string;
   onSaved: () => void;
 }) {
@@ -174,6 +189,43 @@ function AdminCard({
   );
   const [status, setStatus] = useState(marathon.status);
   const [busy, setBusy] = useState(false);
+
+  const comments = stat?.comments ?? 0;
+  const disruptions = stat?.disruptions ?? 0;
+  const minutes = stat?.minutes ?? 0;
+
+  async function remove() {
+    const detail =
+      comments > 0 || disruptions > 0
+        ? `달린 댓글 ${comments}개와 사용자 시간기록 ${disruptions}건(누적 ${minutes}분)도 함께 삭제됩니다.\n\n`
+        : '';
+    if (
+      !window.confirm(
+        `"${marathon.name}" 삭제\n\n${detail}되돌릴 수 없습니다. 정말 삭제하시겠습니까?`,
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch('/api/admin/marathons/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-passcode': passcode,
+        },
+        body: JSON.stringify({ id: marathon.id }),
+      });
+      if (!res.ok) {
+        toast('error', '삭제에 실패했습니다.');
+        return;
+      }
+      toast('success', '삭제되었습니다.');
+      onSaved();
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function save(overrideStatus?: AdminMarathon['status']) {
     let detour_info: Record<string, unknown>;
@@ -231,6 +283,12 @@ function AdminCard({
           {marathon.status} · {marathon.source ?? '-'}
         </span>
         <span className="text-xs text-muted/50">{marathon.id.slice(0, 8)}</span>
+      </div>
+
+      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+        <span className="text-accent2">💬 댓글 {comments}</span>
+        <span className="text-accent">⏱ 누적 {minutes}분</span>
+        <span className="text-muted">🧍 시간기록 {disruptions}명</span>
       </div>
 
       <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -390,6 +448,14 @@ function AdminCard({
             보관(archived)
           </button>
         ) : null}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={remove}
+          className="ml-auto rounded-full border border-red-500/40 px-4 py-2 text-sm text-red-400 transition hover:bg-red-500/10 disabled:opacity-50"
+        >
+          삭제
+        </button>
       </div>
     </motion.div>
   );

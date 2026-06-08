@@ -288,6 +288,63 @@ export function rejectMarathon(id: string): boolean {
   return true;
 }
 
+export function deleteMarathon(id: string): boolean {
+  const i = marathons.findIndex((x) => x.id === id);
+  if (i === -1) {
+    return false;
+  }
+  marathons.splice(i, 1);
+  // 인메모리 cascade — 실제 DB 는 FK on delete cascade 로 동일하게 정리됨.
+  for (let j = disruptions.length - 1; j >= 0; j -= 1) {
+    if (disruptions[j]?.marathon_id === id) {
+      disruptions.splice(j, 1);
+    }
+  }
+  for (let j = comments.length - 1; j >= 0; j -= 1) {
+    if (comments[j]?.marathon_id === id) {
+      comments.splice(j, 1);
+    }
+  }
+  return true;
+}
+
+/** 마라톤별 참여 집계(댓글 수·불편 입력 건수·누적 분) — 관리자 화면용. */
+export function getMarathonEngagement(): Record<
+  string,
+  { disruptions: number; minutes: number; comments: number }
+> {
+  const out: Record<
+    string,
+    { disruptions: number; minutes: number; comments: number }
+  > = {};
+  const ensure = (
+    id: string,
+  ): { disruptions: number; minutes: number; comments: number } => {
+    const cur = out[id];
+    if (cur) {
+      return cur;
+    }
+    const fresh = { disruptions: 0, minutes: 0, comments: 0 };
+    out[id] = fresh;
+    return fresh;
+  };
+  for (const d of disruptions) {
+    if (!d.marathon_id) {
+      continue;
+    }
+    const e = ensure(d.marathon_id);
+    e.disruptions += 1;
+    e.minutes += d.minutes_lost;
+  }
+  for (const c of comments) {
+    if (!c.marathon_id) {
+      continue;
+    }
+    ensure(c.marathon_id).comments += 1;
+  }
+  return out;
+}
+
 // ── 수집 ledger ───────────────────────────────────────────
 export function addCollectionLog(entry: {
   run_id: string;
