@@ -29,17 +29,33 @@ async function collect(
   const todayPrefix = nowIso.slice(0, 10);
   const targets = getResearchTargets().slice(0, AGENT_CONFIG.maxTargetsPerRun);
 
-  // DB 조회 실패해도 수집·보고는 진행한다(중복/일일비용 정보 없이 best-effort).
+  // dedup 원장(content_hash) 조회 실패는 best-effort — 비용 천장과 무관하게
+  // 중복을 못 거를 뿐이므로 수집을 계속한다.
   let existing = new Set<string>();
-  let todayCostStart = 0;
   try {
     existing = await repo.existingContentHashes();
-    todayCostStart = await repo.todayCostUsd(todayPrefix);
   } catch (err) {
-    logger.warn('collection_preload_failed', {
+    logger.warn('collection_dedup_preload_failed', {
       run_id: runId,
       message: err instanceof Error ? err.message : '알 수 없는 오류',
     });
+  }
+
+  // 일일 비용 원장은 L3 dailyQuota(비용 천장)의 유일한 근거다. 못 읽으면 천장을
+  // 강제할 수 없으므로, 0 으로 진행(=천장 무력화)하지 않고 즉시 중단한다(fail-safe).
+  // throw → runCollection 의 catch 가 받아 실패 리포트 메일을 발송한다.
+  let todayCostStart: number;
+  try {
+    todayCostStart = await repo.todayCostUsd(todayPrefix);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '알 수 없는 오류';
+    logger.error('collection_cost_ledger_unreadable', {
+      run_id: runId,
+      message,
+    });
+    throw new Error(
+      `일일 비용 원장 조회 실패 — 비용 천장을 강제할 수 없어 수집을 중단합니다: ${message}`,
+    );
   }
 
   const results: TargetResult[] = [];

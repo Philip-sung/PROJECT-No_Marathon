@@ -4,12 +4,20 @@
  */
 export const AGENT_CONFIG = {
   // L1 per-call
+  //
+  // 호출 1회 worst-case = maxInputTokensPerCall×입력단가 + maxTokens×출력단가.
+  //   Sonnet 기준: 50,000×$3/1M + 2,048×$15/1M = $0.15 + $0.031 ≈ $0.18/호출.
+  // 실측(데모 검색 + 비용사고 데이터): 입력 피크 ~33k, 출력 JSON ~300–450 토큰.
+  // → 출력은 worst-case의 ~17%뿐이라 max_tokens 는 칼자루가 아니고, 2048 밑으로
+  //   내리면 JSON 이 잘려 extractJson 파싱이 실패(호출 통째 낭비)하므로 2048 유지.
+  //   실효 칼자루는 입력 상한 — 실측 피크 ~33k 에 헤드룸 1.5x 로 50k.
   maxTokens: 2048,
   // 호출당 web_search 횟수 상한(비용 폭주 차단의 1순위 레버).
   maxWebSearchUses: 4,
   // 호출당 누적 입력 토큰 상한 — pause_turn 재개 루프가 이 값을 넘으면 즉시 중단.
   // (web_search 결과 재전송으로 입력 토큰이 곱셈 증가하는 폭주를 호출 내부에서 차단)
-  maxInputTokensPerCall: 80_000,
+  // 실측 피크 ~33k 기준 1.5x. 호출 worst-case 를 $0.27→$0.18 로 낮춘다.
+  maxInputTokensPerCall: 50_000,
   // 서버 도구 재개(pause_turn) 최대 횟수.
   maxContinuations: 2,
   // L2 per-session(이번 run)
