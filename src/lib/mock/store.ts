@@ -182,6 +182,10 @@ export function getAllContentHashes(): Set<string> {
   return set;
 }
 
+export function getAllMarathonKeys(): { name: string; event_date: string }[] {
+  return marathons.map((m) => ({ name: m.name, event_date: m.event_date }));
+}
+
 export function addStagingMarathon(
   n: NormalizedMarathon,
   contentHash: string,

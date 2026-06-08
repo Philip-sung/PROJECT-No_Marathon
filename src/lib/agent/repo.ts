@@ -55,6 +55,31 @@ export async function existingContentHashes(): Promise<Set<string>> {
   return new Set(rows.flatMap((r) => (r.content_hash ? [r.content_hash] : [])));
 }
 
+/**
+ * 기존 마라톤의 (이름·날짜) 키 — fuzzy 중복 판정용(name+date 유사도).
+ * content_hash(정확 일치)는 LLM 출력 변동에 뚫려 매일 중복이 쌓이므로, 이 키로 교체한다.
+ */
+export async function existingMarathonKeys(): Promise<
+  { name: string; event_date: string }[]
+> {
+  if (isMock) {
+    return store.getAllMarathonKeys();
+  }
+  const supabase = createAdminSupabase();
+  if (!supabase) {
+    return [];
+  }
+  const { data, error } = await supabase
+    .from('marathons')
+    .select('name, event_date');
+  if (error) {
+    throw new Error(`마라톤 키 조회 실패: ${error.message}`);
+  }
+  return z
+    .array(z.object({ name: z.string(), event_date: z.string() }))
+    .parse(data);
+}
+
 export async function todayCostUsd(todayPrefix: string): Promise<number> {
   if (isMock) {
     return store.getTodayCostUsd(todayPrefix);

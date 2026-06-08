@@ -6,6 +6,7 @@ import { getResearchTargets } from '@/lib/agent/targets';
 import { researchMarathon } from '@/lib/agent/worker';
 import { judgeQuality } from '@/lib/agent/judge';
 import { contentHash } from '@/lib/agent/hash';
+import { isSameMarathon } from '@/lib/agent/similarity';
 import { StructuredCallError } from '@/lib/agent/claude';
 import * as repo from '@/lib/agent/repo';
 import { sendCollectionReport, type StagedSummary } from '@/lib/agent/mail';
@@ -48,11 +49,11 @@ async function collect(
   const todayPrefix = nowIso.slice(0, 10);
   const targets = getResearchTargets().slice(0, AGENT_CONFIG.maxTargetsPerRun);
 
-  // dedup 원장(content_hash) 조회 실패는 best-effort — 비용 천장과 무관하게
-  // 중복을 못 거를 뿐이므로 수집을 계속한다.
-  let existing = new Set<string>();
+  // dedup 키(name+date) 조회 실패는 best-effort — 비용 천장과 무관하게
+  // 중복을 못 거를 뿐이므로 수집을 계속한다. DB 기존 레코드 + 이번 run 적재분을 누적 대조.
+  let existingKeys: { name: string; event_date: string }[] = [];
   try {
-    existing = await repo.existingContentHashes();
+    existingKeys = await repo.existingMarathonKeys();
   } catch (err) {
     logger.warn('collection_dedup_preload_failed', {
       run_id: runId,
@@ -195,9 +196,17 @@ async function collect(
 
     // ── 각 대회: dedup → judge → stage(+publish) ──
     for (const candidate of candidates) {
-      // L2 dedup(content_hash)
-      const hash = contentHash(candidate);
-      if (existing.has(hash)) {
+      const hash = contentHash(candidate); // DB content_hash 컬럼용(정확일치 백스톱)
+      const candKey = {
+        name: candidate.name,
+        event_date: candidate.event_date,
+      };
+      // L2 dedup — 결정론 script: 날짜 동일 + 제목 유사도 ≥ 임계면 같은 대회로 보고 건너뜀.
+      // DB 기존 레코드 + 이번 run 누적분 모두 대조 → 매일 cron 돌아도 중복이 안 쌓인다.
+      const dup = existingKeys.find((k) =>
+        isSameMarathon(candKey, k, AGENT_CONFIG.dedupSimilarityThreshold),
+      );
+      if (dup) {
         await logCollectionSafe({
           run_id: runId,
           target: target.query,
@@ -213,7 +222,7 @@ async function collect(
           outcome: 'skipped_duplicate',
           quality_score: null,
           cost_usd: 0,
-          notes: `${candidate.name} (동일 content_hash)`,
+          notes: `${candidate.name} ≈ ${dup.name} (${dup.event_date})`,
         });
         continue;
       }
@@ -281,7 +290,7 @@ async function collect(
       // 적재 후, autoPublish 면 즉시 게시(품질 통과분만). DB 쓰기 실패는 그 1건만 실패 처리.
       try {
         const newId = await repo.stageMarathon(candidate, hash, nowIso);
-        existing.add(hash);
+        existingKeys.push(candKey);
         if (AGENT_CONFIG.autoPublish) {
           await repo.reviewMarathon(newId, 'publish');
         }

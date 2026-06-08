@@ -31,6 +31,9 @@ export const AGENT_CONFIG = {
   // 품질 게이트(LLM-as-judge). 핵심(대회명·날짜·지역)만 있으면 통과시키는 정책이라
   // 선택 필드(주최 연락처·우회 등) 누락으로 반려하지 않도록 임계를 낮춘다(judge 변동성 여유 포함).
   qualityThreshold: 6.0,
+  // 중복 판정(결정론 script): 날짜 동일 + 제목 유사도 ≥ 이 값이면 같은 대회로 보고 제거.
+  // LLM 출력이 매번 미세하게 달라도 같은 대회를 알아보게 해, 매일 cron 시 중복 누적을 막는다.
+  dedupSimilarityThreshold: 0.8,
   // 수집 즉시 자동 게시(true) — 사람 검수(staging) 생략. 품질 게이트는 그대로 유지.
   // false 면 staging 까지만 적재하고 /admin 에서 수동 게시(ADR-007 원안).
   autoPublish: true,
