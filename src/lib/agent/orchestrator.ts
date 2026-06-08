@@ -15,18 +15,32 @@ import type { CollectionRunResult, TargetResult } from '@/lib/agent/types';
 /**
  * L3 Orchestrator-Worker + L4 Guardrails 통합 heartbeat(1회 실행).
  * 흐름: 타깃 → (가드레일) → worker 정형화 → dedup → judge → dry-run staging → ledger.
- * 가드레일 4단(PDF §12.4): per-call(maxTokens) / per-session(budget) /
- * per-day(quota) / anomaly(failure-rate circuit breaker).
- * 에이전트는 staging 까지만. published 승격은 사람 검수(ADR-007).
+ * 가드레일 4단(PDF §12.4): per-call(maxTokens/maxWebSearchUses/maxInputTokensPerCall) /
+ * per-session(budget) / per-day(quota) / anomaly(failure-rate circuit breaker).
+ *
+ * runCollection 은 성공/실패/크래시 무관하게 **항상 리포트 메일을 발송**한다(토큰·비용 보고).
+ * collect() 내부에서 던져진 예외도 잡아 실패 리포트를 보낸다.
  */
-export async function runCollection(): Promise<CollectionRunResult> {
-  const runId = randomUUID();
-  const nowIso = new Date().toISOString();
+async function collect(
+  runId: string,
+  startedAtIso: string,
+): Promise<{ summary: CollectionRunResult; staged: StagedSummary[] }> {
+  const nowIso = startedAtIso;
   const todayPrefix = nowIso.slice(0, 10);
-
   const targets = getResearchTargets().slice(0, AGENT_CONFIG.maxTargetsPerRun);
-  const existing = await repo.existingContentHashes();
-  const todayCostStart = await repo.todayCostUsd(todayPrefix);
+
+  // DB 조회 실패해도 수집·보고는 진행한다(중복/일일비용 정보 없이 best-effort).
+  let existing = new Set<string>();
+  let todayCostStart = 0;
+  try {
+    existing = await repo.existingContentHashes();
+    todayCostStart = await repo.todayCostUsd(todayPrefix);
+  } catch (err) {
+    logger.warn('collection_preload_failed', {
+      run_id: runId,
+      message: err instanceof Error ? err.message : '알 수 없는 오류',
+    });
+  }
 
   const results: TargetResult[] = [];
   const stagedDetails: StagedSummary[] = [];
@@ -159,16 +173,21 @@ export async function runCollection(): Promise<CollectionRunResult> {
     } catch (err) {
       failures += 1;
       const message = err instanceof Error ? err.message : '알 수 없는 오류';
-      await repo.logCollection({
-        run_id: runId,
-        target: target.query,
-        content_hash: null,
-        status: 'failure',
-        quality_score: null,
-        model: AGENT_CONFIG.workerModel,
-        cost_usd: 0,
-        nowIso,
-      });
+      // 실패 로깅도 best-effort(DB 장애 시 수집·보고가 멈추지 않게).
+      try {
+        await repo.logCollection({
+          run_id: runId,
+          target: target.query,
+          content_hash: null,
+          status: 'failure',
+          quality_score: null,
+          model: AGENT_CONFIG.workerModel,
+          cost_usd: 0,
+          nowIso,
+        });
+      } catch {
+        // 무시 — 결과/메일에는 아래 notes 로 남음.
+      }
       results.push({
         target: target.query,
         outcome: 'failed',
@@ -184,7 +203,6 @@ export async function runCollection(): Promise<CollectionRunResult> {
       failures / results.length > AGENT_CONFIG.maxFailureRate
     ) {
       escalated = true;
-      // external escalation(PDF §11.3): 알림 + 중단.
       await notify({
         level: 'error',
         title: '수집 에이전트 circuit breaker',
@@ -211,6 +229,56 @@ export async function runCollection(): Promise<CollectionRunResult> {
     escalated,
     results,
   };
+  return { summary, staged: stagedDetails };
+}
+
+export async function runCollection(): Promise<CollectionRunResult> {
+  const runId = randomUUID();
+  const startedAtIso = new Date().toISOString();
+
+  let summary: CollectionRunResult;
+  let staged: StagedSummary[] = [];
+  try {
+    const out = await collect(runId, startedAtIso);
+    summary = out.summary;
+    staged = out.staged;
+  } catch (err) {
+    // 오케스트레이션 자체가 터져도 실패 리포트는 반드시 보낸다.
+    const message = err instanceof Error ? err.message : '알 수 없는 오류';
+    logger.error('collection_run_crashed', { run_id: runId, message });
+    summary = {
+      run_id: runId,
+      targets: 0,
+      staged: 0,
+      skipped: 0,
+      rejected: 0,
+      failed: 1,
+      total_cost_usd: 0,
+      total_input_tokens: 0,
+      total_output_tokens: 0,
+      escalated: true,
+      results: [
+        {
+          target: '오케스트레이션 오류',
+          outcome: 'failed',
+          quality_score: null,
+          cost_usd: 0,
+          notes: message,
+        },
+      ],
+    };
+  }
+
+  // 성공·실패·크래시 무관하게 항상 리포트 메일 발송(토큰/비용/실패사유 포함).
+  const mail = await sendCollectionReport({
+    result: summary,
+    staged,
+    startedAtIso,
+    finishedAtIso: new Date().toISOString(),
+    mode: isMock ? 'mock' : 'live',
+    autoPublished: AGENT_CONFIG.autoPublish,
+  });
+
   logger.info('collection_run', {
     run_id: summary.run_id,
     staged: summary.staged,
@@ -221,17 +289,9 @@ export async function runCollection(): Promise<CollectionRunResult> {
     input_tokens: summary.total_input_tokens,
     output_tokens: summary.total_output_tokens,
     escalated: summary.escalated,
+    mail_sent: mail.sent,
+    mail_reason: mail.reason ?? null,
   });
 
-  // 수집 완료 리포트 메일(수동/cron 무관). best-effort — 메일 실패가 수집을 막지 않음.
-  await sendCollectionReport({
-    result: summary,
-    staged: stagedDetails,
-    startedAtIso: nowIso,
-    finishedAtIso: new Date().toISOString(),
-    mode: isMock ? 'mock' : 'live',
-    autoPublished: AGENT_CONFIG.autoPublish,
-  });
-
-  return summary;
+  return { ...summary, mail_sent: mail.sent };
 }

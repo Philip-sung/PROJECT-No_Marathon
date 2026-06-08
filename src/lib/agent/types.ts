@@ -77,4 +77,6 @@ export interface CollectionRunResult {
   total_output_tokens: number;
   escalated: boolean;
   results: TargetResult[];
+  /** 리포트 메일 발송 성공 여부(발송 시도 후 채워짐). */
+  mail_sent?: boolean;
 }

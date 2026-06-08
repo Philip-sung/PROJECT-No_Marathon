@@ -2,6 +2,7 @@ import 'server-only';
 import { z } from 'zod';
 import { isMock } from '@/lib/env';
 import { serverEnv } from '@/lib/env.server';
+import { AGENT_CONFIG } from '@/lib/agent/config';
 import type { Usage } from '@/lib/agent/types';
 
 /**
@@ -23,7 +24,6 @@ interface CallStructuredOpts<S extends z.ZodTypeAny> {
 }
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
-const MAX_CONTINUATIONS = 4;
 
 // content 블록은 type/text 외 필드(server_tool_use 등)를 보존해야 재전송 가능.
 const BlockSchema = z
@@ -63,13 +63,22 @@ export async function callStructured<S extends z.ZodTypeAny>(
     throw new Error('live 모드 수집에는 ANTHROPIC_API_KEY 가 필요합니다.');
   }
 
+  // 프롬프트 캐싱: 시스템 프롬프트는 타깃마다 동일하므로 캐시(반복 호출 시 입력 ~0.1x).
+  const system = [
+    {
+      type: 'text',
+      text: `${opts.system}\n\n작업이 끝나면 반드시 유효한 JSON 객체 하나만 출력하세요. 그 외 설명/문장 금지.`,
+      cache_control: { type: 'ephemeral' },
+    },
+  ];
+
   const messages: { role: 'user' | 'assistant'; content: unknown }[] = [
     { role: 'user', content: opts.prompt },
   ];
   const usage: Usage = { input_tokens: 0, output_tokens: 0 };
   let finalText = '';
 
-  for (let i = 0; i < MAX_CONTINUATIONS; i += 1) {
+  for (let i = 0; i < AGENT_CONFIG.maxContinuations; i += 1) {
     const res = await fetch(ANTHROPIC_URL, {
       method: 'POST',
       headers: {
@@ -80,14 +89,18 @@ export async function callStructured<S extends z.ZodTypeAny>(
       body: JSON.stringify({
         model: opts.model,
         max_tokens: opts.maxTokens,
-        system: `${opts.system}\n\n작업이 끝나면 반드시 유효한 JSON 객체 하나만 출력하세요. 그 외 설명/문장 금지.`,
+        system,
         messages,
         ...(opts.tools ? { tools: opts.tools } : {}),
       }),
     });
 
     if (!res.ok) {
-      throw new Error(`Anthropic API 오류: ${res.status}`);
+      // 에러 본문까지 surface — 400 등 원인 진단·메일 보고용(status 만으론 알 수 없음).
+      const body = await res.text().catch(() => '');
+      throw new Error(
+        `Anthropic API 오류: ${res.status}${body ? ` — ${body.slice(0, 400)}` : ''}`,
+      );
     }
 
     const json: unknown = await res.json();
@@ -99,9 +112,20 @@ export async function callStructured<S extends z.ZodTypeAny>(
       .join('')
       .trim();
 
-    // 서버 도구 루프가 멈춤 → assistant 응답을 되돌려 보내 재개.
-    if (envelope.stop_reason === 'pause_turn') {
-      messages.push({ role: 'assistant', content: envelope.content });
+    // 서버 도구 루프가 멈춤(pause_turn) → assistant 응답을 되돌려 재개.
+    // 단 누적 입력 토큰이 상한을 넘으면 폭주 방지를 위해 더 재개하지 않고 중단.
+    if (
+      envelope.stop_reason === 'pause_turn' &&
+      usage.input_tokens < AGENT_CONFIG.maxInputTokensPerCall
+    ) {
+      // 마지막 블록에 캐시 breakpoint — 커지는 대화 prefix(거대한 검색결과 포함)를
+      // 캐시해 다음 재개 호출의 재전송 비용을 ~0.1x 로 낮춘다.
+      const content = envelope.content.map((b, idx) =>
+        idx === envelope.content.length - 1
+          ? { ...b, cache_control: { type: 'ephemeral' } }
+          : b,
+      );
+      messages.push({ role: 'assistant', content });
       continue;
     }
     break;
