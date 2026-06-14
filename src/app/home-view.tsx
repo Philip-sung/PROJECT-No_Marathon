@@ -137,7 +137,9 @@ export function HomeView({
       {/* 고지 및 면책 안내 */}
       <Reveal>
         <section className="mt-8 space-y-2.5 text-xs leading-relaxed text-muted/70">
-          <h2 className="text-sm font-semibold text-muted">고지 및 면책 안내</h2>
+          <h2 className="text-sm font-semibold text-muted">
+            고지 및 면책 안내
+          </h2>
           <p>
             본 사이트는 공익을 목적으로 한 시민 참여형 기록 플랫폼입니다. 특정
             행사나 주최자를 반대·비방하려는 것이 아니며, 마라톤 문화 자체는

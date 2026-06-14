@@ -221,7 +221,11 @@ function AdminCard({
   function readZone(): Record<string, unknown> {
     try {
       const parsed: unknown = JSON.parse(zoneText || '{}');
-      if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      if (
+        parsed !== null &&
+        typeof parsed === 'object' &&
+        !Array.isArray(parsed)
+      ) {
         const out: Record<string, unknown> = {};
         Object.assign(out, parsed);
         return out;
@@ -507,8 +511,8 @@ function AdminCard({
               </div>
             ) : null}
             <p className="mt-1.5 text-xs text-muted/60">
-              수집 중 참조한 코스맵입니다(부정확할 수 있음). 이걸 보고 아래 지도에
-              직접 점을 찍으세요. 공개 페이지에는 노출되지 않습니다.
+              수집 중 참조한 코스맵입니다(부정확할 수 있음). 이걸 보고 아래
+              지도에 직접 점을 찍으세요. 공개 페이지에는 노출되지 않습니다.
             </p>
           </div>
         ) : (
@@ -519,8 +523,8 @@ function AdminCard({
         )}
 
         <p className="mt-2 text-xs text-muted/70">
-          지도 위 코스 모양을 보고 출발 → 도착 순서대로 클릭하세요. 점 2개 이상이면
-          공개 페이지에 경로 선으로 표시됩니다.
+          지도 위 코스 모양을 보고 출발 → 도착 순서대로 클릭하세요. 점 2개
+          이상이면 공개 페이지에 경로 선으로 표시됩니다.
         </p>
         <div className="mt-2">
           <RouteEditor
