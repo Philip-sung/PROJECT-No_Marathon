@@ -42,6 +42,17 @@ export const ControlZoneSchema = z.object({
     .array(z.tuple([z.number(), z.number()]))
     .nullish()
     .transform((v) => v ?? undefined),
+  // 관리자 전용 참조 자료(공개 X). 수집 에이전트가 "이 코스맵을 보고 경로를 직접 찍어라"는 뜻으로
+  // 제안하는, 경로지도가 실린 페이지 URL과 그 코스맵 이미지의 직접 URL.
+  // 관리자가 세부 경로를 수동으로 찍을 때 참고만 하므로 정확성은 보장하지 않는다(틀려도 무방).
+  route_ref_page_url: z
+    .string()
+    .nullish()
+    .transform((v) => (v && v.trim() !== '' ? v.trim() : undefined)),
+  route_ref_image_url: z
+    .string()
+    .nullish()
+    .transform((v) => (v && v.trim() !== '' ? v.trim() : undefined)),
 });
 export type ControlZone = z.infer<typeof ControlZoneSchema>;
 

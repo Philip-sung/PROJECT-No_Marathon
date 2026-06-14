@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { z } from 'zod';
 import { AdminMarathonSchema, type AdminMarathon } from '@/lib/db/schema';
+import { ControlZoneSchema } from '@/lib/agent/types';
+import { RouteEditor } from '@/components/admin/route-editor';
 import { useToast } from '@/components/ui/toast';
 
 const StatsSchema = z.object({
@@ -193,6 +195,81 @@ function AdminCard({
   const comments = stat?.comments ?? 0;
   const disruptions = stat?.disruptions ?? 0;
   const minutes = stat?.minutes ?? 0;
+
+  // control_zone(JSON 문자열)을 파싱해 경로 편집기에 줄 점 목록/이미지/중심을 도출.
+  // 저장의 단일 진실 공급원은 여전히 zoneText 이고, 편집기 조작은 zoneText 를 갱신한다.
+  const zone = useMemo(() => {
+    try {
+      const parsed = ControlZoneSchema.safeParse(JSON.parse(zoneText || '{}'));
+      return parsed.success ? parsed.data : {};
+    } catch {
+      return {};
+    }
+  }, [zoneText]);
+  const routePoints: [number, number][] = zone.polygon ?? [];
+  const routeRefPageUrl = zone.route_ref_page_url ?? '';
+  const routeRefImageUrl = zone.route_ref_image_url ?? '';
+  const latN = parseNum(lat);
+  const lngN = parseNum(lng);
+  const editorCenter: [number, number] = zone.center
+    ? [zone.center.lat, zone.center.lng]
+    : latN != null && lngN != null
+      ? [latN, lngN]
+      : [37.5665, 126.978]; // 서울시청(점·좌표 모두 없을 때 기본 중심)
+
+  // zoneText 를 객체로 읽어와(망가졌으면 빈 객체) 변형 후 다시 직렬화하는 공통 경로.
+  function readZone(): Record<string, unknown> {
+    try {
+      const parsed: unknown = JSON.parse(zoneText || '{}');
+      if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const out: Record<string, unknown> = {};
+        Object.assign(out, parsed);
+        return out;
+      }
+    } catch {
+      // 무시: 빈 객체에서 다시 시작.
+    }
+    return {};
+  }
+  function writeZone(next: Record<string, unknown>) {
+    setZoneText(JSON.stringify(next, null, 2));
+  }
+  function centroid(
+    pts: [number, number][],
+  ): { lat: number; lng: number } | null {
+    if (pts.length === 0) {
+      return null;
+    }
+    let sumLat = 0;
+    let sumLng = 0;
+    for (const p of pts) {
+      sumLat += p[0];
+      sumLng += p[1];
+    }
+    return { lat: sumLat / pts.length, lng: sumLng / pts.length };
+  }
+  function commitPolygon(next: [number, number][]) {
+    const z = readZone();
+    if (next.length === 0) {
+      delete z.polygon;
+    } else {
+      z.polygon = next;
+    }
+    const c = centroid(next);
+    if (c) {
+      z.center = c;
+    }
+    writeZone(z);
+  }
+  function addPoint(p: [number, number]) {
+    commitPolygon([...routePoints, p]);
+  }
+  function undoPoint() {
+    commitPolygon(routePoints.slice(0, -1));
+  }
+  function clearRoute() {
+    commitPolygon([]);
+  }
 
   async function remove() {
     const detail =
@@ -392,15 +469,97 @@ function AdminCard({
           onChange={(e) => setDetourText(e.target.value)}
         />
       </label>
-      <label className="mt-2 block text-xs text-muted">
-        통제구간(control_zone, JSON)
+      {/* 통제 경로 직접 찍기 */}
+      <div className="mt-3 rounded-xl border border-line/70 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-xs font-semibold text-accent2">
+            통제 경로 (지도를 클릭해 직접 찍기)
+          </span>
+          <span className="text-xs text-muted">점 {routePoints.length}개</span>
+        </div>
+
+        {/* 수집 에이전트가 참조한 경로지도(있을 때만 표시·읽기전용·비공개): 이걸 보고 아래 지도에 점을 찍는다. */}
+        {routeRefPageUrl || routeRefImageUrl ? (
+          <div className="mt-2 rounded-lg border border-line/60 bg-white/[0.02] p-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-muted">
+                수집된 참고 경로지도 (비공개)
+              </p>
+              {routeRefPageUrl ? (
+                <a
+                  href={routeRefPageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-none text-xs text-accent hover:underline"
+                >
+                  원본 페이지 열기 ↗
+                </a>
+              ) : null}
+            </div>
+            {routeRefImageUrl ? (
+              <div className="mt-2 overflow-hidden rounded-lg border border-line">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={routeRefImageUrl}
+                  alt="수집된 참고 경로지도"
+                  className="max-h-72 w-full object-contain"
+                />
+              </div>
+            ) : null}
+            <p className="mt-1.5 text-xs text-muted/60">
+              수집 중 참조한 코스맵입니다(부정확할 수 있음). 이걸 보고 아래 지도에
+              직접 점을 찍으세요. 공개 페이지에는 노출되지 않습니다.
+            </p>
+          </div>
+        ) : (
+          <p className="mt-2 text-xs text-muted/50">
+            수집된 참고 경로지도가 없습니다. 원본 출처나 지도 앱을 참고해 직접
+            찍으세요.
+          </p>
+        )}
+
+        <p className="mt-2 text-xs text-muted/70">
+          지도 위 코스 모양을 보고 출발 → 도착 순서대로 클릭하세요. 점 2개 이상이면
+          공개 페이지에 경로 선으로 표시됩니다.
+        </p>
+        <div className="mt-2">
+          <RouteEditor
+            points={routePoints}
+            defaultCenter={editorCenter}
+            onAddPoint={addPoint}
+          />
+        </div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={undoPoint}
+            disabled={routePoints.length === 0}
+            className="rounded-full border border-line px-3 py-1.5 text-xs text-muted transition hover:text-fg disabled:opacity-40"
+          >
+            마지막 점 취소
+          </button>
+          <button
+            type="button"
+            onClick={clearRoute}
+            disabled={routePoints.length === 0}
+            className="rounded-full border border-line px-3 py-1.5 text-xs text-muted transition hover:text-fg disabled:opacity-40"
+          >
+            전체 지우기
+          </button>
+        </div>
+      </div>
+
+      <details className="mt-2">
+        <summary className="cursor-pointer text-xs text-muted/70">
+          고급: control_zone 직접 편집(JSON)
+        </summary>
         <textarea
           className={`${inputCls} font-mono`}
-          rows={3}
+          rows={4}
           value={zoneText}
           onChange={(e) => setZoneText(e.target.value)}
         />
-      </label>
+      </details>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <label className="text-xs text-muted">
