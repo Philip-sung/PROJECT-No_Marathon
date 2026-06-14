@@ -173,7 +173,6 @@ export function RecordView() {
       {/* 주최측 정보 */}
       <section className="glass rounded-2xl p-5 text-sm">
         <h2 className="font-bold">주최측 정보</h2>
-        <h3 className="font-bold">주최측 정보</h3>
         <dl className="mt-3 space-y-1.5 text-muted">
           <div>
             <dt className="inline text-muted/60">주최 </dt>
